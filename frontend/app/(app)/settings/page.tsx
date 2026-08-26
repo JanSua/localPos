@@ -17,8 +17,9 @@ import type { PinCodeRecord } from "@/hooks/useMasters";
 import type { ShopSettings } from "@/lib/types";
 import { UsersPanel } from "./UsersPanel";
 import { ReferenceDataTab } from "./ReferenceDataTab";
+import { IntegrationsTab } from "./IntegrationsTab";
 
-const TABS = ["Company", "Tax & Loyalty", "Receipt", "Reference Data", "Password", "Staff"] as const;
+const TABS = ["Company", "Tax & Loyalty", "Receipt", "Reference Data", "Integrations", "Password", "Staff"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function SettingsPage() {
@@ -79,6 +80,7 @@ export default function SettingsPage() {
       {tab === "Tax & Loyalty" && <TaxLoyaltyTab settings={settings} />}
       {tab === "Receipt" && <ReceiptTab settings={settings} />}
       {tab === "Reference Data" && <ReferenceDataTab />}
+      {tab === "Integrations" && <IntegrationsTab />}
       {tab === "Password" && <PasswordTab />}
       {tab === "Staff" && <UsersPanel />}
     </div>

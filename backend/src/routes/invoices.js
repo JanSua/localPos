@@ -3,6 +3,7 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { requireAuth, verifyPassword } = require('../middleware/auth');
 const { computeSale, round2 } = require('../lib/pricing');
+const { notifyStockChange } = require('../lib/webhooks');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -84,7 +85,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const invoice = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const settings = await tx.shopSettings.findFirst();
       if (!settings) throw Object.assign(new Error('Shop settings not configured'), { status: 400 });
 
@@ -321,8 +322,23 @@ router.post('/', async (req, res) => {
         });
       }
 
-      return created;
+      return { created, restockProductIds: [...restock.keys()] };
     });
+
+    const { created: invoice, restockProductIds } = result;
+
+    // Notify any linked external integration (e.g. a storefront) that stock
+    // just changed here, for every product this bill touched (sold and/or
+    // restocked via a return) that has a SKU linked. Deliberately outside
+    // the transaction (a webhook call is a network operation, not a DB
+    // write) and never awaited into the response — see lib/webhooks.js.
+    const touchedProductIds = [...new Set([...body.items.map((i) => i.productId), ...restockProductIds])];
+    if (touchedProductIds.length > 0) {
+      prisma.product
+        .findMany({ where: { id: { in: touchedProductIds }, sku: { not: null } } })
+        .then((products) => notifyStockChange(products.map((p) => ({ sku: p.sku, stock: p.stock }))))
+        .catch((err) => console.error('post-checkout stock webhook lookup failed', err));
+    }
 
     res.status(201).json(invoice);
   } catch (err) {

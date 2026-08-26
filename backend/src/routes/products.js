@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
+const { notifyStockChange } = require('../lib/webhooks');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -14,6 +15,17 @@ router.use(requireAuth);
 // the POST (create) route, where every field really is required-or-defaulted.
 const fields = {
   barcode: z.string().trim().min(1).max(64),
+  // Optional key used only to link this product to an external system over
+  // the External Stock API (see routes/external.js) — most products never
+  // set this. Empty string normalizes to null (Prisma's unique index on a
+  // nullable column allows any number of nulls, but not two empty strings).
+  sku: z
+    .string()
+    .trim()
+    .max(64)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v ? v : null)),
   name: z.string().trim().min(1).max(200),
   category: z.string().trim().max(80).optional().or(z.literal('')),
   hsn: z.string().trim().max(20).optional().or(z.literal('')),
@@ -92,6 +104,10 @@ router.post('/', async (req, res) => {
   }
   const existing = await prisma.product.findUnique({ where: { barcode: parsed.data.barcode } });
   if (existing) return res.status(409).json({ error: 'Barcode already exists', product: existing });
+  if (parsed.data.sku) {
+    const existingSku = await prisma.product.findUnique({ where: { sku: parsed.data.sku } });
+    if (existingSku) return res.status(409).json({ error: 'SKU already linked to another product', product: existingSku });
+  }
 
   let data;
   try {
@@ -119,8 +135,14 @@ router.put('/:id', async (req, res) => {
   }
   try {
     const product = await prisma.product.update({ where: { id }, data });
+    if ('stock' in data && product.sku) {
+      notifyStockChange([{ sku: product.sku, stock: product.stock }]);
+    }
     res.json(product);
-  } catch {
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'SKU already linked to another product' });
+    }
     res.status(404).json({ error: 'Product not found' });
   }
 });

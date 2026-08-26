@@ -3,6 +3,7 @@ const { z } = require('zod');
 const prisma = require('../lib/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { round2 } = require('../lib/pricing');
+const { notifyStockChange } = require('../lib/webhooks');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -107,10 +108,17 @@ router.post('/', async (req, res) => {
         }
       }
 
-      return created;
+      return { created, productIds: [...new Set(returnLines.map((l) => l.invoiceItem.productId))] };
     });
 
-    res.status(201).json(result);
+    if (result.productIds.length > 0) {
+      prisma.product
+        .findMany({ where: { id: { in: result.productIds }, sku: { not: null } } })
+        .then((products) => notifyStockChange(products.map((p) => ({ sku: p.sku, stock: p.stock }))))
+        .catch((err) => console.error('post-return stock webhook lookup failed', err));
+    }
+
+    res.status(201).json(result.created);
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error(err);

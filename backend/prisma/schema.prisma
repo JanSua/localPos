@@ -65,6 +65,12 @@ model ShopSettings {
 model Product {
   id            Int           @id @default(autoincrement())
   barcode       String        @unique
+  // Separate from `barcode` — this is the shared key used to match a
+  // product against an external catalog (e.g. an e-commerce storefront)
+  // over the External API below. Optional: most shops never link a
+  // product externally, and SQLite's unique index allows any number of
+  // NULLs, so leaving it blank never collides with another blank one.
+  sku           String?       @unique
   name          String
   category      String?
   hsn           String?
@@ -192,6 +198,30 @@ model ReturnItem {
 // IFSC) are deliberately NOT bundled with the app — see README > Reference
 // data & validation. These tables just give the admin somewhere to load
 // the official file into, if/when they want autocomplete and lookups.
+
+// A credential for an external system (e.g. an e-commerce storefront) to
+// call the External Stock API (see routes/external.js). The plaintext key
+// is shown to the admin exactly once, at creation — only its SHA-256 hash
+// is ever stored, same principle as a password hash. `webhookUrl`, when
+// set, is where this integration is notified (HMAC-signed with its own
+// `webhookSecret`) whenever a linked product's stock changes here, so a
+// connected storefront can mirror stock live instead of only pulling it.
+model ApiKey {
+  id            Int       @id @default(autoincrement())
+  name          String
+  // First 8 hex chars of the key, kept only so the admin list can show
+  // "which key is this" without ever re-displaying the full secret.
+  keyPrefix     String
+  keyHash       String    @unique
+  // Read-only keys can only look up stock; write keys may also adjust it
+  // (used by a storefront reporting its own sales back to the POS).
+  canWrite      Boolean   @default(false)
+  webhookUrl    String?
+  webhookSecret String?
+  lastUsedAt    DateTime?
+  revoked       Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+}
 
 model TaxCode {
   id          Int     @id @default(autoincrement())

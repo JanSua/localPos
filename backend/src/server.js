@@ -13,6 +13,8 @@ const invoiceRoutes = require('./routes/invoices');
 const returnRoutes = require('./routes/returns');
 const printRoutes = require('./routes/print');
 const mastersRoutes = require('./routes/masters');
+const apiKeyRoutes = require('./routes/apiKeys');
+const externalRoutes = require('./routes/external');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -64,6 +66,8 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/print', printRoutes);
 app.use('/api/masters', mastersRoutes);
+app.use('/api/api-keys', apiKeyRoutes);
+app.use('/api/external', externalRoutes);
 
 app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 

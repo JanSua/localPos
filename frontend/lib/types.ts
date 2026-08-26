@@ -41,6 +41,9 @@ export interface ShopSettings {
 export interface Product {
   id: number;
   barcode: string;
+  // Links this product to an external system (e.g. an e-commerce
+  // storefront) over the External Stock API — see Settings > Integrations.
+  sku: string | null;
   name: string;
   category: string | null;
   hsn: string | null;
@@ -53,6 +56,28 @@ export interface Product {
   stock: number;
   createdAt: string;
   updatedAt: string;
+}
+
+// A credential for an external system to call the External Stock API.
+// Never carries the plaintext key or webhook secret except right after
+// creation/rotation — see Settings > Integrations.
+export interface ApiKey {
+  id: number;
+  name: string;
+  keyPrefix: string;
+  canWrite: boolean;
+  webhookUrl: string | null;
+  webhookSecretSet: boolean;
+  lastUsedAt: string | null;
+  revoked: boolean;
+  createdAt: string;
+}
+
+// Only present in the response right after POST/PATCH — the one moment the
+// admin can see (and must copy down) the real secrets.
+export interface ApiKeyWithSecrets extends ApiKey {
+  apiKey?: string;
+  webhookSecret?: string;
 }
 
 export interface Customer {

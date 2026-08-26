@@ -6,6 +6,7 @@ import type { Product } from "@/lib/types";
 
 export interface ProductInput {
   barcode: string;
+  sku?: string;
   name: string;
   category?: string;
   hsn?: string;

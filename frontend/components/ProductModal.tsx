@@ -21,6 +21,7 @@ import type { Product } from "@/lib/types";
 
 const productSchema = z.object({
   barcode: z.string().trim().min(1, "Barcode is required"),
+  sku: z.string().trim().optional(),
   name: z.string().trim().min(1, "Product name is required"),
   category: z.string().trim().optional(),
   hsn: z.string().trim().optional(),
@@ -65,6 +66,7 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
     resolver: zodResolver(productSchema),
     defaultValues: {
       barcode: product?.barcode ?? initialBarcode ?? "",
+      sku: product?.sku ?? "",
       name: product?.name ?? "",
       category: product?.category ?? "",
       hsn: product?.hsn ?? "",
@@ -209,6 +211,18 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
             </div>
           )}
           <Field label="Product name" error={errors.name?.message} {...register("name")} />
+          <div>
+            <Field
+              label="SKU (optional)"
+              placeholder="Links this product to an external system"
+              error={errors.sku?.message}
+              {...register("sku")}
+            />
+            <p className="mt-1 text-xs text-foreground/50">
+              Used to match this product against an e-commerce storefront over the External Stock API — see Settings
+              → Integrations. Leave blank if this product isn&apos;t sold anywhere else.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Category" list="category-options" {...register("category")} />
             <Select label="Unit" options={UNIT_OPTIONS} {...register("unit")} />

@@ -85,6 +85,7 @@ troubleshooting.
 - [Project structure](#project-structure)
 - [Local development (without Docker)](#local-development-without-docker)
 - [API overview](#api-overview)
+- [External Stock API (e-commerce integration)](#external-stock-api-e-commerce-integration)
 - [Security](#security)
 - [Contributing](#contributing)
 - [License](#license)
@@ -951,6 +952,80 @@ All endpoints are under `/api` and reached through the frontend proxy at
 | `POST /masters/tax-codes/import`, `GET /masters/tax-codes/search` | Import (**admin only**) / autocomplete HSN or SAC codes |
 | `POST /masters/pincodes/import`, `GET /masters/pincodes/:code` | Import (**admin only**) / look up a PIN code |
 | `POST /masters/ifsc/import`, `GET /masters/ifsc/:code` | Import (**admin only**) / look up an IFSC code |
+| `GET/POST/PUT/DELETE /api-keys`  | Manage External Stock API credentials (**admin only**, step-up password confirm) — see below |
+
+## External Stock API (e-commerce integration)
+
+A separate, key-authenticated API — not the session-cookie auth every other
+route above uses — for an external system (typically an e-commerce
+storefront) to read this shop's live stock and, if you allow it, report its
+own sales back so stock stays correct in both places without manual
+reconciliation.
+
+### Setting it up
+
+1. In the app, go to **Settings → Integrations → New API key**.
+2. Give it a name, decide whether it can only *read* stock or also *write*
+   it (write access lets the connected system decrement stock when it sells
+   something), and optionally a `https://` webhook URL on the other system
+   that should be notified whenever a linked product's stock changes here.
+3. Copy the **API key** and (if you set a webhook URL) the **webhook
+   secret** shown — both are shown exactly once and can't be retrieved
+   again. Store them as secrets in the other system, not in its repo.
+4. On each product you want to expose (Inventory → edit product), set its
+   **SKU** to the same value the other system uses to identify that product.
+   A product with no SKU is never returned by this API.
+
+### Endpoints
+
+All under `/api/external`, reached the same way as everything else — through
+the frontend proxy (`https://<your-domain>/api/external/...`), so whatever
+HTTPS front door you've set up (see [Where to run it](#where-to-run-it)) is
+what secures this too; don't expose the backend's own port directly.
+Authenticate with `Authorization: Bearer <api key>`.
+
+| Method & path | Access | Purpose |
+| --- | --- | --- |
+| `GET /external/products` | any valid key | Every product with a SKU linked: `{ sku, name, stock, unit, sellingPrice, taxRate, updatedAt }` |
+| `GET /external/products/:sku` | any valid key | Same shape, single product |
+| `PATCH /external/products/:sku/stock` | **write** keys only | Adjust stock — body is `{ "delta": -2 }` (relative) or `{ "set": 17 }` (absolute), never both. Rejects going negative unless *Allow selling below zero stock* is on in Settings, same rule a POS checkout follows. Add `"idempotencyKey": "<your event id>"` to make a retried call safe to resend — a repeated key returns the original result instead of applying the change twice (kept in memory for 24h) |
+
+### Webhook (stock pushed to you)
+
+If a key has a webhook URL, this shop `POST`s it whenever a linked product's
+stock changes here — a POS sale, a return, or a manual stock edit:
+
+```json
+POST <your webhook URL>
+X-Nodedr-Signature: sha256=<hex>
+Content-Type: application/json
+
+{
+  "event": "stock.updated",
+  "timestamp": "2026-08-26T12:00:00.000Z",
+  "changes": [{ "sku": "MUG-001", "stock": 14 }]
+}
+```
+
+Verify the signature before trusting the body: it's an HMAC-SHA256 of the
+raw request bytes using *that key's own* webhook secret (from step 3 above),
+hex-encoded. Delivery is best-effort with an 8s timeout and is never
+retried automatically by this app — treat "set stock to N for this SKU" as
+idempotent on your side (safe to apply even if a delivery is ever repeated
+or arrives out of order) rather than relying on exactly-once delivery.
+
+### Design notes
+
+- Keys are hashed (SHA-256) at rest — the plaintext key and webhook secret
+  are never stored and never shown again after creation.
+- A write key can only ever *decrease this shop's* uncertainty by reporting
+  real sales — it can't read or touch anything outside `/api/external`
+  (no customer data, no settings, no other product fields).
+- Revoking a key is immediate and permanent; issue a new one rather than
+  expecting a revoked key to come back.
+- This surface has its own, stricter rate limit (120 req/min per IP) on top
+  of the app-wide one, since — unlike the rest of this app — it's meant to
+  be reachable from outside your shop's LAN.
 
 ## Security
 
