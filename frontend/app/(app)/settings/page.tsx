@@ -26,7 +26,6 @@ import type { ShopSettings } from "@/lib/types";
 import { UsersPanel } from "./UsersPanel";
 import { ReferenceDataTab } from "./ReferenceDataTab";
 import { IntegrationsTab } from "./IntegrationsTab";
-
 const TABS = [
   "Empresa",
   "Impuestos y Lealtad",
