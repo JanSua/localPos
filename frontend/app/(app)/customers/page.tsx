@@ -66,14 +66,14 @@ export default function CustomersPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Customers</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Clientes</h1>
           <p className="text-sm text-foreground/60">
             {shop?.loyaltyEnabled ? "Loyalty members and their points." : "Your customer directory."}
           </p>
         </div>
         <Button onClick={() => setShowForm((s) => !s)}>
           <Plus className="h-4 w-4" aria-hidden="true" />
-          Add customer
+          Añadir cliente
         </Button>
       </div>
 
@@ -84,9 +84,9 @@ export default function CustomersPage() {
             <Field label="Phone" error={errors.phone?.message} {...register("phone")} />
             <Field label="Email (optional)" {...register("email")} />
             <div className="flex items-end gap-2 sm:col-span-3">
-              <Button type="submit" disabled={isSubmitting}>Save customer</Button>
+              <Button type="submit" disabled={isSubmitting}>Guardar cliente</Button>
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
-                <X className="h-4 w-4" aria-hidden="true" /> Cancel
+                <X className="h-4 w-4" aria-hidden="true" /> Cancelar
               </Button>
             </div>
           </form>
@@ -107,21 +107,21 @@ export default function CustomersPage() {
         </div>
 
         {isLoading ? (
-          <p className="py-10 text-center text-sm text-foreground/50">Loading…</p>
+          <p className="py-10 text-center text-sm text-foreground/50">Cargando...</p>
         ) : !customers || customers.length === 0 ? (
-          <p className="py-10 text-center text-sm text-foreground/50">No customers yet.</p>
+          <p className="py-10 text-center text-sm text-foreground/50">Sin clientes aún.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max text-left text-sm">
               <thead>
                 <tr className="text-xs uppercase text-foreground/50">
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Phone</th>
-                  <th className="py-2 pr-4 text-right">Visits</th>
-                  <th className="py-2 pr-4 text-right">Total spent</th>
+                  <th className="py-2 pr-4">Nombre</th>
+                  <th className="py-2 pr-4">Teléfono</th>
+                  <th className="py-2 pr-4 text-right">Visitas</th>
+                  <th className="py-2 pr-4 text-right">Total gastado</th>
                   <th className="py-2 pr-4 text-right">Due</th>
-                  <th className="py-2 pr-4 text-right">Store credit</th>
-                  {shop?.loyaltyEnabled && <th className="py-2 text-right">Points</th>}
+                  <th className="py-2 pr-4 text-right">Crédito con la tienda</th>
+                  {shop?.loyaltyEnabled && <th className="py-2 text-right">Puntos</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">

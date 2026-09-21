@@ -90,8 +90,8 @@ export default function OnboardingPage() {
       <Card className="w-full max-w-lg p-8">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Image src="/logo.png" alt="nodedr-pos" width={64} height={64} className="h-16 w-16 rounded-full" priority />
-          <h1 className="text-xl font-semibold text-foreground">Welcome to nodedr-pos</h1>
-          <p className="text-sm text-foreground/60">Let&apos;s set up your shop.</p>
+          <h1 className="text-xl font-semibold text-foreground">Bienvenido a localPos</h1>
+          <p className="text-sm text-foreground/60">Configuremos la tienda.</p>
         </div>
 
         <ol className="mb-8 flex items-center justify-center gap-2" aria-label="Onboarding progress">
@@ -116,7 +116,7 @@ export default function OnboardingPage() {
 
         {step === 0 && (
           <form onSubmit={accountForm.handleSubmit(onAccountSubmit)} noValidate className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-foreground/70">Step 1 — Admin account</h2>
+            <h2 className="text-sm font-semibold text-foreground/70">Paso 1 — Cuenta de Administrador</h2>
             <Field label="Your name" error={accountForm.formState.errors.name?.message} {...accountForm.register("name")} />
             <Field
               label="Email"
@@ -195,7 +195,7 @@ export default function OnboardingPage() {
               />
               {loyaltyEnabled && (
                 <p className="mt-3 text-xs text-foreground/50">
-                  Starts at 1 point per unit spent, 1 point = 0.1 in currency. You can fine-tune this later in Settings.
+                  Empieza desde 1 punto por unidad gastada. Es decir, 1 punto es = 0,1 COP, esto se puede ajustar en Configuraciones.
                 </p>
               )}
             </div>
@@ -217,10 +217,10 @@ export default function OnboardingPage() {
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
               <Check className="h-7 w-7 text-success" aria-hidden="true" />
             </span>
-            <h2 className="text-lg font-semibold text-foreground">You&apos;re all set!</h2>
-            <p className="text-sm text-foreground/60">Your shop is configured and ready to start selling.</p>
+            <h2 className="text-lg font-semibold text-foreground">Ya estás listo.</h2>
+            <p className="text-sm text-foreground/60">La tienda ha sido configurada y está lista para empezar a vender.</p>
             <Button className="mt-2 w-full" onClick={() => router.replace("/dashboard")}>
-              Go to Dashboard
+              Ir al Inicio
             </Button>
           </div>
         )}

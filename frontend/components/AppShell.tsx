@@ -32,12 +32,17 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/pos", label: "POS Checkout", icon: ScanBarcode },
-  { href: "/inventory", label: "Inventory", icon: Package },
-  { href: "/customers", label: "Customers", icon: Users },
-  { href: "/sales", label: "Sales", icon: ReceiptText },
-  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
+  { href: "/dashboard", label: "Panel", icon: LayoutDashboard },
+  { href: "/pos", label: "Punto de Venta", icon: ScanBarcode },
+  { href: "/inventory", label: "Inventario", icon: Package },
+  { href: "/customers", label: "Clientes", icon: Users },
+  { href: "/sales", label: "Ventas", icon: ReceiptText },
+  {
+    href: "/settings",
+    label: "Configuración",
+    icon: Settings,
+    adminOnly: true,
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -70,13 +75,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
+      if (
+        userMenuRef.current &&
+        !userMenuRef.current.contains(e.target as Node)
+      )
+        setUserMenuOpen(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.adminOnly || me?.role === "admin");
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.adminOnly || me?.role === "admin",
+  );
   const isOnline = health?.status === "ok";
   const sym = shop?.currencySymbol || "Rs.";
 
@@ -85,13 +96,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile header */}
       <header className="flex items-center justify-between border-b border-border-subtle bg-surface px-4 py-3 lg:hidden">
         <div className="flex items-center gap-2">
-          <Image src="/logo.png" alt="" width={28} height={28} className="h-7 w-7 shrink-0 rounded-full" aria-hidden="true" />
-          <span className="truncate font-semibold text-foreground">{shop?.shopName || "nodedr-pos"}</span>
+          <Image
+            src="/logo.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 rounded-full"
+            aria-hidden="true"
+          />
+          <span className="truncate font-semibold text-foreground">
+            {shop?.shopName || "nodedr-pos"}
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            aria-label="Search"
+            aria-label="Buscar"
             onClick={() => setSearchOpen(true)}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted hover:bg-surface-muted"
           >
@@ -100,11 +120,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ThemeToggle />
           <button
             type="button"
-            aria-label={navOpen ? "Close menu" : "Open menu"}
+            aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
             onClick={() => setNavOpen((v) => !v)}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted hover:bg-surface-muted"
           >
-            {navOpen ? <X className="h-5 w-5" aria-hidden="true" /> : <Menu className="h-5 w-5" aria-hidden="true" />}
+            {navOpen ? (
+              <X className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            )}
           </button>
         </div>
       </header>
@@ -121,14 +145,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside
         className={clsx(
           "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-border-subtle bg-surface transition-transform duration-200 lg:static lg:z-auto lg:translate-x-0",
-          navOpen ? "translate-x-0" : "-translate-x-full"
+          navOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex items-center gap-2.5 border-b border-border-subtle px-5 py-5">
           <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft">
-            <Image src="/logo.png" alt="" width={22} height={22} className="h-[22px] w-[22px] rounded-md" aria-hidden="true" />
+            <Image
+              src="/logo.png"
+              alt=""
+              width={22}
+              height={22}
+              className="h-[22px] w-[22px] rounded-md"
+              aria-hidden="true"
+            />
           </span>
-          <span className="truncate font-semibold tracking-tight text-foreground">{shop?.shopName || "nodedr-pos"}</span>
+          <span className="truncate font-semibold tracking-tight text-foreground">
+            {shop?.shopName || "nodedr-pos"}
+          </span>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
           {visibleItems.map((item) => {
@@ -143,10 +176,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                   active
                     ? "bg-brand-soft text-foreground before:absolute before:-left-3 before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-full before:bg-brand before:shadow-[0_0_8px_var(--brand-glow)]"
-                    : "text-foreground-muted hover:translate-x-0.5 hover:bg-surface-muted hover:text-foreground"
+                    : "text-foreground-muted hover:translate-x-0.5 hover:bg-surface-muted hover:text-foreground",
                 )}
               >
-                <Icon className={clsx("h-[18px] w-[18px]", active && "text-brand icon-glow")} aria-hidden="true" />
+                <Icon
+                  className={clsx(
+                    "h-[18px] w-[18px]",
+                    active && "text-brand icon-glow",
+                  )}
+                  aria-hidden="true"
+                />
                 {item.label}
               </Link>
             );
@@ -155,8 +194,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="border-t border-border-subtle p-3">
           {me && (
             <div className="mb-2 px-3 py-1.5">
-              <p className="truncate text-sm font-medium text-foreground">{me.name}</p>
-              <p className="text-xs capitalize text-foreground-muted">{me.role}</p>
+              <p className="truncate text-sm font-medium text-foreground">
+                {me.name}
+              </p>
+              <p className="text-xs capitalize text-foreground-muted">
+                {me.role}
+              </p>
             </div>
           )}
           <button
@@ -164,15 +207,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
           >
             <LogOut className="h-[18px] w-[18px]" aria-hidden="true" />
-            Log out
+            Cerrar sesión
           </button>
           <div className="mt-3 flex items-center gap-1.5 px-3 text-[11px] text-foreground-muted">
             {isOnline ? (
               <Cloud className="h-3.5 w-3.5 text-success" aria-hidden="true" />
             ) : (
-              <CloudOff className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+              <CloudOff
+                className="h-3.5 w-3.5 text-warning"
+                aria-hidden="true"
+              />
             )}
-            {isOnline ? "Synced with local server" : "Local server unreachable"}
+            {isOnline
+              ? "Sincronizado con el servidor local"
+              : "Servidor local inaccesible"}
           </div>
           <BrandFooter className="mt-2" />
         </div>
@@ -185,11 +233,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href={me?.role === "admin" ? "/settings" : "#"}
             className={clsx(
               "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground transition-colors",
-              me?.role === "admin" && "hover:bg-surface-muted"
+              me?.role === "admin" && "hover:bg-surface-muted",
             )}
           >
             <span className="truncate">{shop?.shopName || "nodedr-pos"}</span>
-            {me?.role === "admin" && <ChevronDown className="h-3.5 w-3.5 text-foreground-muted" aria-hidden="true" />}
+            {me?.role === "admin" && (
+              <ChevronDown
+                className="h-3.5 w-3.5 text-foreground-muted"
+                aria-hidden="true"
+              />
+            )}
           </Link>
 
           <button
@@ -198,19 +251,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="flex flex-1 max-w-md items-center gap-2 rounded-lg border border-border-subtle bg-surface-muted/60 px-3 py-2 text-sm text-foreground-muted transition-colors hover:border-border hover:text-foreground"
           >
             <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="flex-1 text-left">Search products, jump to a page…</span>
-            <kbd className="rounded-md border border-border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium">⌘K</kbd>
+            <span className="flex-1 text-left">
+              Buscar productos, ir a una página…
+            </span>
+            <kbd className="rounded-md border border-border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium">
+              ⌘K
+            </kbd>
           </button>
 
           <div className="ml-auto flex items-center gap-2">
             <span className="hidden items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-foreground-muted xl:flex">
               <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
-              Last 14 Days
+              Últimos 14 días
             </span>
 
             <Link
               href="/inventory"
-              aria-label={`${lowStock?.products.length ?? 0} low-stock alerts`}
+              aria-label={`${lowStock?.products.length ?? 0} alertas de stock bajo`}
               className="relative flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
             >
               <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
@@ -225,7 +282,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setUserMenuOpen((v) => !v)}
-                aria-label="Account menu"
+                aria-label="Menú de cuenta"
                 aria-expanded={userMenuOpen}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand transition-transform hover:scale-105"
               >
@@ -234,8 +291,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {userMenuOpen && (
                 <div className="glass-panel absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-xl bg-surface-elevated shadow-2xl">
                   <div className="border-b border-border-subtle px-3.5 py-3">
-                    <p className="truncate text-sm font-medium text-foreground">{me?.name}</p>
-                    <p className="text-xs capitalize text-foreground-muted">{me?.role}</p>
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {me?.name}
+                    </p>
+                    <p className="text-xs capitalize text-foreground-muted">
+                      {me?.role}
+                    </p>
                   </div>
                   {me?.role === "admin" && (
                     <Link
@@ -243,8 +304,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-foreground transition-colors hover:bg-surface-muted"
                     >
-                      <Settings className="h-4 w-4 text-foreground-muted" aria-hidden="true" />
-                      Settings
+                      <Settings
+                        className="h-4 w-4 text-foreground-muted"
+                        aria-hidden="true"
+                      />
+                      Configuración
                     </Link>
                   )}
                   <button
@@ -252,8 +316,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     onClick={handleLogout}
                     className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm text-foreground transition-colors hover:bg-surface-muted"
                   >
-                    <LogOut className="h-4 w-4 text-foreground-muted" aria-hidden="true" />
-                    Log out
+                    <LogOut
+                      className="h-4 w-4 text-foreground-muted"
+                      aria-hidden="true"
+                    />
+                    Cerrar sesión
                   </button>
                 </div>
               )}
@@ -261,10 +328,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
       </div>
 
-      {searchOpen && <GlobalSearch onClose={() => setSearchOpen(false)} sym={sym} />}
+      {searchOpen && (
+        <GlobalSearch onClose={() => setSearchOpen(false)} sym={sym} />
+      )}
     </div>
   );
 }

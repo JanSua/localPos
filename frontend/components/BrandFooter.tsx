@@ -1,7 +1,7 @@
 export function BrandFooter({ className }: { className?: string }) {
   return (
     <p className={`text-center text-[11px] leading-tight text-foreground/40 ${className ?? ""}`}>
-      Developed by{" "}
+      Desarrollado por{" "}
       <a
         href="https://www.nodedr.com/"
         target="_blank"

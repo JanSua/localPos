@@ -1,14 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Award, CircleDollarSign, Download, Package, Receipt, Star, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Award,
+  CircleDollarSign,
+  Download,
+  Package,
+  Receipt,
+  Star,
+  TrendingUp,
+} from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Sparkline } from "@/components/ui/Sparkline";
 import { SalesCharts } from "@/components/SalesCharts";
 import { useLowStock, useProducts } from "@/hooks/useProducts";
-import { useInvoices, useSalesAnalytics, useSalesSummary } from "@/hooks/useInvoices";
-import { useDueSummary, useTopDueCustomers, useTopLoyaltyCustomers } from "@/hooks/useCustomers";
+import {
+  useInvoices,
+  useSalesAnalytics,
+  useSalesSummary,
+} from "@/hooks/useInvoices";
+import {
+  useDueSummary,
+  useTopDueCustomers,
+  useTopLoyaltyCustomers,
+} from "@/hooks/useCustomers";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { formatMoney } from "@/lib/format";
 
@@ -44,13 +63,15 @@ export default function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-sm text-foreground/60">Overview of your shop.</p>
+          <h1 className="text-2xl font-semibold text-foreground">Inicio</h1>
+          <p className="text-sm text-foreground/60">
+            Vista general de la tienda.
+          </p>
         </div>
         <a href="/api/invoices/export.csv" download>
           <Button type="button" variant="secondary">
             <Download className="h-4 w-4" aria-hidden="true" />
-            Export sales CSV
+            Exportar ventas a CSV
           </Button>
         </a>
       </div>
@@ -58,28 +79,32 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           icon={Receipt}
-          label="Today's Sales"
+          label="Ventas de hoy"
           value={`${summary?.todaysCount ?? 0}`}
           delta={salesDelta}
           sparkline={trend.map((t) => t.count)}
         />
         <StatCard
           icon={TrendingUp}
-          label="Today's Revenue"
+          label="Ingresos de hoy"
           value={money(summary?.todaysRevenue ?? 0)}
           delta={revenueDelta}
           sparkline={trend.map((t) => t.revenue)}
         />
-        <StatCard icon={Package} label="Total Products" value={`${products?.length ?? 0}`} />
+        <StatCard
+          icon={Package}
+          label="Total de productos"
+          value={`${products?.length ?? 0}`}
+        />
         <StatCard
           icon={AlertTriangle}
-          label="Low Stock Items"
+          label="Artículos con stock bajo"
           value={`${lowStock?.products.length ?? 0}`}
           accent={lowStock?.products.length ? "warning" : undefined}
         />
         <StatCard
           icon={CircleDollarSign}
-          label="Total Due"
+          label="Total adeudado"
           value={money(dueSummary?.totalDue ?? 0)}
           accent={dueSummary?.totalDue ? "danger" : undefined}
         />
@@ -91,9 +116,14 @@ export default function DashboardPage() {
             <Award className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
-            <p className="text-xs font-medium text-foreground/50">Best seller (last 14 days)</p>
+            <p className="text-xs font-medium text-foreground/50">
+              Mejor vendedor (últimos 14 días)
+            </p>
             <p className="text-base font-semibold text-foreground">
-              {bestSeller.name} <span className="font-normal text-foreground/60">· {bestSeller.quantity} sold · {money(bestSeller.revenue)}</span>
+              {bestSeller.name}{" "}
+              <span className="font-normal text-foreground/60">
+                · {bestSeller.quantity} vendido · {money(bestSeller.revenue)}
+              </span>
             </p>
           </div>
         </Card>
@@ -104,25 +134,38 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">Low Inventory Alerts</h2>
-            <Link href="/inventory" className="text-sm font-medium text-brand hover:underline">
-              Manage inventory
+            <h2 className="text-base font-semibold text-foreground">
+              Alertas de inventario bajo
+            </h2>
+            <Link
+              href="/inventory"
+              className="text-sm font-medium text-brand hover:underline"
+            >
+              Gestionar Invetario
             </Link>
           </div>
           {!lowStock || lowStock.products.length === 0 ? (
             <p className="py-6 text-center text-sm text-foreground/50">
-              All products are above the low-stock threshold ({lowStock?.threshold ?? 5}).
+              Todos los productos están encima del límite de stock. (
+              {lowStock?.threshold ?? 5}).
             </p>
           ) : (
             <ul className="divide-y divide-border">
               {lowStock.products.map((product) => (
-                <li key={product.id} className="flex items-center justify-between py-3">
+                <li
+                  key={product.id}
+                  className="flex items-center justify-between py-3"
+                >
                   <div>
-                    <p className="text-sm font-medium text-foreground">{product.name}</p>
-                    <p className="text-xs text-foreground/50">Barcode: {product.barcode}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {product.name}
+                    </p>
+                    <p className="text-xs text-foreground/50">
+                      Código de barras: {product.barcode}
+                    </p>
                   </div>
                   <span className="rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
-                    {product.stock} left
+                    {product.stock} restante
                   </span>
                 </li>
               ))}
@@ -132,26 +175,38 @@ export default function DashboardPage() {
 
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">Top Customers</h2>
-            <Link href="/customers" className="text-sm font-medium text-brand hover:underline">
-              View all
+            <h2 className="text-base font-semibold text-foreground">
+              Mejores clientes
+            </h2>
+            <Link
+              href="/customers"
+              className="text-sm font-medium text-brand hover:underline"
+            >
+              Ver todo
             </Link>
           </div>
           {!topCustomers || topCustomers.length === 0 ? (
             <p className="py-6 text-center text-sm text-foreground/50">
-              No loyalty points earned yet.
+              Sin puntos de lealtad aún.
             </p>
           ) : (
             <ul className="divide-y divide-border">
               {topCustomers.map((customer, i) => (
-                <li key={customer.id} className="flex items-center justify-between py-3">
+                <li
+                  key={customer.id}
+                  className="flex items-center justify-between py-3"
+                >
                   <div className="flex items-center gap-3">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-muted text-xs font-semibold text-foreground/60">
                       {i + 1}
                     </span>
                     <div>
-                      <p className="text-sm font-medium text-foreground">{customer.name}</p>
-                      <p className="text-xs text-foreground/50">{customer.phone}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {customer.name}
+                      </p>
+                      <p className="text-xs text-foreground/50">
+                        {customer.phone}
+                      </p>
                     </div>
                   </div>
                   <span className="flex items-center gap-1 rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
@@ -166,20 +221,34 @@ export default function DashboardPage() {
 
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">Customers with Due</h2>
-            <Link href="/customers" className="text-sm font-medium text-brand hover:underline">
-              View all
+            <h2 className="text-base font-semibold text-foreground">
+              Compradores con deuda
+            </h2>
+            <Link
+              href="/customers"
+              className="text-sm font-medium text-brand hover:underline"
+            >
+              Ver Todos
             </Link>
           </div>
           {!topDueCustomers || topDueCustomers.length === 0 ? (
-            <p className="py-6 text-center text-sm text-foreground/50">No outstanding dues right now.</p>
+            <p className="py-6 text-center text-sm text-foreground/50">
+              No hay deudas pendientes en este momento.
+            </p>
           ) : (
             <ul className="divide-y divide-border">
               {topDueCustomers.map((customer) => (
-                <li key={customer.id} className="flex items-center justify-between py-3">
+                <li
+                  key={customer.id}
+                  className="flex items-center justify-between py-3"
+                >
                   <div>
-                    <p className="text-sm font-medium text-foreground">{customer.name}</p>
-                    <p className="text-xs text-foreground/50">{customer.phone}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {customer.name}
+                    </p>
+                    <p className="text-xs text-foreground/50">
+                      {customer.phone}
+                    </p>
                   </div>
                   <span className="rounded-full bg-danger-soft px-3 py-1 text-xs font-semibold text-danger">
                     {money(customer.totalDue)}
@@ -193,31 +262,46 @@ export default function DashboardPage() {
 
       <Card className="p-5">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">Recent Invoices</h2>
-          <Link href="/sales" className="text-sm font-medium text-brand hover:underline">
-            View all
+          <h2 className="text-base font-semibold text-foreground">
+            Facturas recientes
+          </h2>
+          <Link
+            href="/sales"
+            className="text-sm font-medium text-brand hover:underline"
+          >
+            Ver todo
           </Link>
         </div>
         {!invoices || invoices.length === 0 ? (
-          <p className="py-6 text-center text-sm text-foreground/50">No sales recorded yet.</p>
+          <p className="py-6 text-center text-sm text-foreground/50">
+            Aún no hay ventas registradas.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max text-left text-sm">
               <thead>
                 <tr className="text-xs uppercase text-foreground/50">
-                  <th className="py-2 pr-4">Invoice #</th>
-                  <th className="py-2 pr-4">Customer</th>
-                  <th className="py-2 pr-4">Date</th>
+                  <th className="py-2 pr-4">Factura #</th>
+                  <th className="py-2 pr-4">Cliente</th>
+                  <th className="py-2 pr-4">Fecha</th>
                   <th className="py-2 text-right">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {invoices.slice(0, 8).map((inv) => (
                   <tr key={inv.id}>
-                    <td className="py-2.5 pr-4 font-medium text-foreground">{inv.invoiceNumber}</td>
-                    <td className="py-2.5 pr-4 text-foreground/70">{inv.customerName}</td>
-                    <td className="py-2.5 pr-4 text-foreground/70">{new Date(inv.createdAt).toLocaleString()}</td>
-                    <td className="py-2.5 text-right font-medium text-foreground">{money(inv.totalAmount)}</td>
+                    <td className="py-2.5 pr-4 font-medium text-foreground">
+                      {inv.invoiceNumber}
+                    </td>
+                    <td className="py-2.5 pr-4 text-foreground/70">
+                      {inv.customerName}
+                    </td>
+                    <td className="py-2.5 pr-4 text-foreground/70">
+                      {new Date(inv.createdAt).toLocaleString()}
+                    </td>
+                    <td className="py-2.5 text-right font-medium text-foreground">
+                      {money(inv.totalAmount)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -267,7 +351,9 @@ function StatCard({
             </span>
             <p className="text-xs font-medium text-foreground-muted">{label}</p>
           </div>
-          <p className="text-2xl font-bold tracking-tight text-foreground">{value}</p>
+          <p className="text-2xl font-bold tracking-tight text-foreground">
+            {value}
+          </p>
           {hasTrend && (
             <p
               className={`mt-1.5 flex items-center gap-1 text-xs font-medium ${
@@ -280,12 +366,15 @@ function StatCard({
                 <ArrowDownRight className="h-3.5 w-3.5" aria-hidden="true" />
               )}
               {Math.abs(delta!).toFixed(1)}%
-              <span className="font-normal text-foreground-muted">vs yesterday</span>
+              <span className="font-normal text-foreground-muted">vs ayer</span>
             </p>
           )}
         </div>
         {sparkline && sparkline.length > 1 && (
-          <Sparkline data={sparkline} color={positive || !hasTrend ? "var(--brand)" : "var(--danger)"} />
+          <Sparkline
+            data={sparkline}
+            color={positive || !hasTrend ? "var(--brand)" : "var(--danger)"}
+          />
         )}
       </div>
     </Card>
