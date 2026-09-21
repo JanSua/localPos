@@ -187,7 +187,7 @@ export function ProductModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-modal-title"
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-surface p-6 shadow-xl"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-surface p-6 shadow-xl"
       >
         <div className="mb-5 flex items-center justify-between">
           <h2
