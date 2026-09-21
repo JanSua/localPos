@@ -10,15 +10,19 @@ import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { SettleDueModal } from "@/components/SettleDueModal";
 import { useToast } from "@/components/Toast";
-import { useCustomers, useCreateCustomer, useSettleDue } from "@/hooks/useCustomers";
+import {
+  useCustomers,
+  useCreateCustomer,
+  useSettleDue,
+} from "@/hooks/useCustomers";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { formatMoney } from "@/lib/format";
 import { ApiError } from "@/lib/api";
 import type { Customer } from "@/lib/types";
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
-  phone: z.string().trim().min(3, "Phone is required"),
+  name: z.string().trim().min(1, "El nombre es obligatorio"),
+  phone: z.string().trim().min(3, "El teléfono es obligatorio"),
   email: z.string().trim().optional(),
 });
 type Form = z.infer<typeof schema>;
@@ -35,12 +39,20 @@ export default function CustomersPage() {
   const sym = shop?.currencySymbol || "Rs.";
 
   async function clearDue(c: Customer) {
-    if (!window.confirm(`Clear ${formatMoney(c.totalDue, sym)} due for ${c.name}? This marks it fully paid.`)) return;
+    if (
+      !window.confirm(
+        `¿Saldar ${formatMoney(c.totalDue, sym)} de deuda de ${c.name}? Esto la marca como totalmente pagada.`,
+      )
+    )
+      return;
     try {
       await settleDue.mutateAsync({ id: c.id, amount: c.totalDue });
-      show(`Due cleared for ${c.name}`, "success");
+      show(`Deuda saldada para ${c.name}`, "success");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not clear due", "error");
+      show(
+        err instanceof ApiError ? err.message : "No se pudo saldar la deuda",
+        "error",
+      );
     }
   }
 
@@ -54,11 +66,14 @@ export default function CustomersPage() {
   async function onCreate(values: Form) {
     try {
       await createCustomer.mutateAsync(values);
-      show("Customer added", "success");
+      show("Cliente agregado", "success");
       reset();
       setShowForm(false);
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not add customer", "error");
+      show(
+        err instanceof ApiError ? err.message : "No se pudo agregar el cliente",
+        "error",
+      );
     }
   }
 
@@ -68,7 +83,9 @@ export default function CustomersPage() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Clientes</h1>
           <p className="text-sm text-foreground/60">
-            {shop?.loyaltyEnabled ? "Loyalty members and their points." : "Your customer directory."}
+            {shop?.loyaltyEnabled
+              ? "Miembros de lealtad y sus puntos."
+              : "Tu directorio de clientes."}
           </p>
         </div>
         <Button onClick={() => setShowForm((s) => !s)}>
@@ -79,13 +96,34 @@ export default function CustomersPage() {
 
       {showForm && (
         <Card className="p-6">
-          <form onSubmit={handleSubmit(onCreate)} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Field label="Name" error={errors.name?.message} {...register("name")} />
-            <Field label="Phone" error={errors.phone?.message} {...register("phone")} />
-            <Field label="Email (optional)" {...register("email")} />
+          <form
+            onSubmit={handleSubmit(onCreate)}
+            noValidate
+            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+          >
+            <Field
+              label="Nombre"
+              error={errors.name?.message}
+              {...register("name")}
+            />
+            <Field
+              label="Teléfono"
+              error={errors.phone?.message}
+              {...register("phone")}
+            />
+            <Field
+              label="Correo electrónico (opcional)"
+              {...register("email")}
+            />
             <div className="flex items-end gap-2 sm:col-span-3">
-              <Button type="submit" disabled={isSubmitting}>Guardar cliente</Button>
-              <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
+              <Button type="submit" disabled={isSubmitting}>
+                Guardar cliente
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowForm(false)}
+              >
                 <X className="h-4 w-4" aria-hidden="true" /> Cancelar
               </Button>
             </div>
@@ -100,16 +138,20 @@ export default function CustomersPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or phone…"
-            aria-label="Search customers"
+            placeholder="Buscar por nombre o teléfono…"
+            aria-label="Buscar clientes"
             className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/40"
           />
         </div>
 
         {isLoading ? (
-          <p className="py-10 text-center text-sm text-foreground/50">Cargando...</p>
+          <p className="py-10 text-center text-sm text-foreground/50">
+            Cargando...
+          </p>
         ) : !customers || customers.length === 0 ? (
-          <p className="py-10 text-center text-sm text-foreground/50">Sin clientes aún.</p>
+          <p className="py-10 text-center text-sm text-foreground/50">
+            Sin clientes aún.
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-max text-left text-sm">
@@ -119,18 +161,30 @@ export default function CustomersPage() {
                   <th className="py-2 pr-4">Teléfono</th>
                   <th className="py-2 pr-4 text-right">Visitas</th>
                   <th className="py-2 pr-4 text-right">Total gastado</th>
-                  <th className="py-2 pr-4 text-right">Due</th>
-                  <th className="py-2 pr-4 text-right">Crédito con la tienda</th>
-                  {shop?.loyaltyEnabled && <th className="py-2 text-right">Puntos</th>}
+                  <th className="py-2 pr-4 text-right">Deuda</th>
+                  <th className="py-2 pr-4 text-right">
+                    Crédito con la tienda
+                  </th>
+                  {shop?.loyaltyEnabled && (
+                    <th className="py-2 text-right">Puntos</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {customers.map((c) => (
                   <tr key={c.id}>
-                    <td className="py-2.5 pr-4 font-medium text-foreground">{c.name}</td>
-                    <td className="py-2.5 pr-4 text-foreground/70">{c.phone}</td>
-                    <td className="py-2.5 pr-4 text-right text-foreground/70">{c.visits}</td>
-                    <td className="py-2.5 pr-4 text-right text-foreground/70">{formatMoney(c.totalSpent, sym)}</td>
+                    <td className="py-2.5 pr-4 font-medium text-foreground">
+                      {c.name}
+                    </td>
+                    <td className="py-2.5 pr-4 text-foreground/70">
+                      {c.phone}
+                    </td>
+                    <td className="py-2.5 pr-4 text-right text-foreground/70">
+                      {c.visits}
+                    </td>
+                    <td className="py-2.5 pr-4 text-right text-foreground/70">
+                      {formatMoney(c.totalSpent, sym)}
+                    </td>
                     <td className="py-2.5 pr-4 text-right">
                       {c.totalDue >= 0.01 ? (
                         <div className="flex items-center justify-end gap-1.5">
@@ -138,15 +192,15 @@ export default function CustomersPage() {
                             type="button"
                             onClick={() => setSettleTarget(c)}
                             className="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger/20"
-                            title="Record a payment"
+                            title="Registrar un pago"
                           >
                             {formatMoney(c.totalDue, sym)}
                           </button>
                           <button
                             type="button"
                             onClick={() => clearDue(c)}
-                            aria-label={`Clear due for ${c.name}`}
-                            title="Clear due (mark fully paid)"
+                            aria-label={`Saldar deuda de ${c.name}`}
+                            title="Saldar deuda (marcar como totalmente pagada)"
                             className="text-foreground/40 hover:text-success"
                           >
                             <Check className="h-4 w-4" aria-hidden="true" />
@@ -181,7 +235,13 @@ export default function CustomersPage() {
         )}
       </Card>
 
-      {settleTarget && <SettleDueModal customer={settleTarget} sym={sym} onClose={() => setSettleTarget(null)} />}
+      {settleTarget && (
+        <SettleDueModal
+          customer={settleTarget}
+          sym={sym}
+          onClose={() => setSettleTarget(null)}
+        />
+      )}
     </div>
   );
 }

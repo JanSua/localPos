@@ -10,24 +10,48 @@ import { Toggle } from "@/components/ui/Toggle";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
 import { usePasswordConfirm } from "@/components/PasswordConfirm";
-import { useCurrencies, useShopSettings, useUpdateSettings } from "@/hooks/useShopSettings";
+import {
+  useCurrencies,
+  useShopSettings,
+  useUpdateSettings,
+} from "@/hooks/useShopSettings";
 import { api, ApiError } from "@/lib/api";
-import { gstStateFromGstin, isValidGstinFormat, isValidPanFormat } from "@/lib/masters";
+import {
+  gstStateFromGstin,
+  isValidGstinFormat,
+  isValidPanFormat,
+} from "@/lib/masters";
 import type { PinCodeRecord } from "@/hooks/useMasters";
 import type { ShopSettings } from "@/lib/types";
 import { UsersPanel } from "./UsersPanel";
 import { ReferenceDataTab } from "./ReferenceDataTab";
 import { IntegrationsTab } from "./IntegrationsTab";
 
-const TABS = ["Company", "Tax & Loyalty", "Receipt", "Reference Data", "Integrations", "Password", "Staff"] as const;
+const TABS = [
+  "Empresa",
+  "Impuestos y Lealtad",
+  "Recibo",
+  "Datos de Referencia",
+  "Integraciones",
+  "Contraseña",
+  "Personal",
+] as const;
 type Tab = (typeof TABS)[number];
 
 export default function SettingsPage() {
-  const { data: settings, isLoading, isError, error, refetch } = useShopSettings();
-  const [tab, setTab] = useState<Tab>("Company");
+  const {
+    data: settings,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useShopSettings();
+  const [tab, setTab] = useState<Tab>("Empresa");
 
   if (isLoading) {
-    return <p className="text-sm text-foreground/50">Loading settings…</p>;
+    return (
+      <p className="text-sm text-foreground/50">Cargando configuración…</p>
+    );
   }
 
   // A successful response can legitimately be `null` (no ShopSettings row
@@ -40,16 +64,16 @@ export default function SettingsPage() {
           {isError
             ? error instanceof ApiError
               ? error.message
-              : "Could not load settings — check your connection and try again"
-            : "This shop hasn't finished setup yet — no company details have been saved."}
+              : "No se pudo cargar la configuración — verifica tu conexión e inténtalo de nuevo"
+            : "Esta tienda aún no ha terminado la configuración — no se han guardado los datos de la empresa."}
         </p>
         {isError ? (
           <Button variant="secondary" onClick={() => refetch()}>
-            Retry
+            Reintentar
           </Button>
         ) : (
           <Link href="/onboarding">
-            <Button variant="secondary">Finish setup</Button>
+            <Button variant="secondary">Terminar configuración</Button>
           </Link>
         )}
       </div>
@@ -58,7 +82,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">Settings</h1>
+      <h1 className="text-2xl font-semibold text-foreground">Configuración</h1>
 
       <div className="flex flex-wrap gap-1 border-b border-border">
         {TABS.map((t) => (
@@ -76,13 +100,13 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {tab === "Company" && <CompanyTab settings={settings} />}
-      {tab === "Tax & Loyalty" && <TaxLoyaltyTab settings={settings} />}
-      {tab === "Receipt" && <ReceiptTab settings={settings} />}
-      {tab === "Reference Data" && <ReferenceDataTab />}
-      {tab === "Integrations" && <IntegrationsTab />}
-      {tab === "Password" && <PasswordTab />}
-      {tab === "Staff" && <UsersPanel />}
+      {tab === "Empresa" && <CompanyTab settings={settings} />}
+      {tab === "Impuestos y Lealtad" && <TaxLoyaltyTab settings={settings} />}
+      {tab === "Recibo" && <ReceiptTab settings={settings} />}
+      {tab === "Datos de Referencia" && <ReferenceDataTab />}
+      {tab === "Integraciones" && <IntegrationsTab />}
+      {tab === "Contraseña" && <PasswordTab />}
+      {tab === "Personal" && <UsersPanel />}
     </div>
   );
 }
@@ -92,10 +116,11 @@ function useSaver() {
   const { show } = useToast();
   const { withPasswordConfirm } = usePasswordConfirm();
   return async (patch: Partial<ShopSettings>) => {
-    const result = await withPasswordConfirm("save these settings", (confirmPassword) =>
-      update.mutateAsync({ ...patch, confirmPassword })
+    const result = await withPasswordConfirm(
+      "guardar esta configuración",
+      (confirmPassword) => update.mutateAsync({ ...patch, confirmPassword }),
     );
-    if (result) show("Settings saved", "success");
+    if (result) show("Configuración guardada", "success");
   };
 }
 
@@ -105,13 +130,21 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
   const { show } = useToast();
   // Initialised once from the loaded settings (the parent only renders this
   // tab after settings load, and remounts it on tab switch).
-  const [form, setForm] = useState(settings);
+  // allowNegativeStock defaults to `true` when the backend has no stored
+  // value yet, but stays fully switchable by the user.
+  const [form, setForm] = useState<ShopSettings>({
+    ...settings,
+    allowNegativeStock: settings.allowNegativeStock ?? true,
+  });
   const [lookingUp, setLookingUp] = useState(false);
-  const currencyOptions = Object.entries(currencies ?? {}).map(([value, c]) => ({
-    value,
-    label: `${c.symbol} ${c.label} (${value})`,
-  }));
-  const set = (k: keyof ShopSettings, v: string | number) => setForm((f) => ({ ...f, [k]: v }));
+  const currencyOptions = Object.entries(currencies ?? {}).map(
+    ([value, c]) => ({
+      value,
+      label: `${c.symbol} ${c.label} (${value})`,
+    }),
+  );
+  const set = (k: keyof ShopSettings, v: string | number) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   // Only works once PIN codes have been imported on the Reference Data tab
   // — no PIN database ships with the app (see README).
@@ -120,11 +153,22 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
     if (!pin) return;
     setLookingUp(true);
     try {
-      const record = await api.get<PinCodeRecord>(`/masters/pincodes/${encodeURIComponent(pin)}`);
-      setForm((f) => ({ ...f, city: record.district || f.city, state: record.state || f.state }));
+      const record = await api.get<PinCodeRecord>(
+        `/masters/pincodes/${encodeURIComponent(pin)}`,
+      );
+      setForm((f) => ({
+        ...f,
+        city: record.district || f.city,
+        state: record.state || f.state,
+      }));
       show(`${record.area || record.district}, ${record.state}`, "success");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "PIN code not found — import PIN codes in Reference Data first", "info");
+      show(
+        err instanceof ApiError
+          ? err.message
+          : "Código PIN no encontrado — importa los códigos PIN en Datos de Referencia primero",
+        "info",
+      );
     } finally {
       setLookingUp(false);
     }
@@ -152,40 +196,78 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
         }}
         className="flex flex-col gap-4"
       >
-        <Field label="Shop name" value={form.shopName} onChange={(e) => set("shopName", e.target.value)} />
-        <Field label="Legal name" value={form.legalName ?? ""} onChange={(e) => set("legalName", e.target.value)} />
-        <Field label="Address line 1" value={form.address1} onChange={(e) => set("address1", e.target.value)} />
-        <Field label="Address line 2" value={form.address2 ?? ""} onChange={(e) => set("address2", e.target.value)} />
+        <Field
+          label="Nombre de la tienda"
+          value={form.shopName}
+          onChange={(e) => set("shopName", e.target.value)}
+        />
+        <Field
+          label="Razón social"
+          value={form.legalName ?? ""}
+          onChange={(e) => set("legalName", e.target.value)}
+        />
+        <Field
+          label="Dirección línea 1"
+          value={form.address1}
+          onChange={(e) => set("address1", e.target.value)}
+        />
+        <Field
+          label="Dirección línea 2"
+          value={form.address2 ?? ""}
+          onChange={(e) => set("address2", e.target.value)}
+        />
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <Field
-              label="PIN code"
+              label="Código PIN"
               value={form.pincode ?? ""}
               onChange={(e) => set("pincode", e.target.value)}
-              placeholder="Auto-fills city/state below, if imported"
+              placeholder="Rellena automáticamente ciudad/estado abajo, si está importado"
             />
           </div>
-          <Button type="button" variant="secondary" onClick={lookupPincode} disabled={lookingUp} aria-label="Look up PIN code">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={lookupPincode}
+            disabled={lookingUp}
+            aria-label="Buscar código PIN"
+          >
             <Search className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="City" value={form.city ?? ""} onChange={(e) => set("city", e.target.value)} />
-          <Field label="State" value={form.state ?? ""} onChange={(e) => set("state", e.target.value)} />
+          <Field
+            label="Ciudad"
+            value={form.city ?? ""}
+            onChange={(e) => set("city", e.target.value)}
+          />
+          <Field
+            label="Estado"
+            value={form.state ?? ""}
+            onChange={(e) => set("state", e.target.value)}
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Phone" value={form.phone ?? ""} onChange={(e) => set("phone", e.target.value)} />
-          <Field label="Email" value={form.email ?? ""} onChange={(e) => set("email", e.target.value)} />
+          <Field
+            label="Teléfono"
+            value={form.phone ?? ""}
+            onChange={(e) => set("phone", e.target.value)}
+          />
+          <Field
+            label="Correo electrónico"
+            value={form.email ?? ""}
+            onChange={(e) => set("email", e.target.value)}
+          />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Select
-            label="Currency"
+            label="Moneda"
             options={currencyOptions}
             value={form.currencyCode}
             onChange={(e) => set("currencyCode", e.target.value)}
           />
           <Field
-            label="Low stock alert"
+            label="Alerta de stock bajo"
             type="number"
             min={0}
             value={form.lowStockAlert}
@@ -193,12 +275,14 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
           />
         </div>
         <Toggle
-          label="Allow selling below zero stock"
-          description="Checkout won't be blocked when a scanned item's stock is already at 0 or lower than the quantity sold — useful if you sell faster than you update counts and reconcile later"
+          label="Permitir vender con stock bajo cero"
+          description="El cobro no se bloqueará cuando el stock de un artículo escaneado ya esté en 0 o sea menor que la cantidad vendida — útil si vendes más rápido de lo que actualizas los conteos y concilias después"
           checked={form.allowNegativeStock}
           onChange={(v) => setForm((f) => ({ ...f, allowNegativeStock: v }))}
         />
-        <Button type="submit" className="self-start">Save company details</Button>
+        <Button type="submit" className="self-start">
+          Guardar datos de la empresa
+        </Button>
       </form>
     </Card>
   );
@@ -211,18 +295,20 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
   return (
     <div className="flex max-w-2xl flex-col gap-6">
       <Card className="p-6">
-        <h2 className="mb-4 text-base font-semibold text-foreground">GST / Tax</h2>
+        <h2 className="mb-4 text-base font-semibold text-foreground">
+          GST / Impuestos
+        </h2>
         <div className="flex flex-col gap-4">
           <Toggle
-            label="Enable GST"
-            description="Apply per-product GST and show tax on receipts"
+            label="Habilitar GST"
+            description="Aplicar GST por producto y mostrar impuestos en los recibos"
             checked={form.gstEnabled}
             onChange={(v) => setForm((f) => ({ ...f, gstEnabled: v }))}
           />
           {form.gstEnabled && (
             <>
               <Toggle
-                label="Show GST breakdown on receipt"
+                label="Mostrar desglose de GST en el recibo"
                 checked={form.showGst}
                 onChange={(v) => setForm((f) => ({ ...f, showGst: v }))}
               />
@@ -231,34 +317,55 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
                   <Field
                     label="GSTIN"
                     value={form.gstNumber ?? ""}
-                    onChange={(e) => setForm((f) => ({ ...f, gstNumber: e.target.value.toUpperCase() }))}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        gstNumber: e.target.value.toUpperCase(),
+                      }))
+                    }
                   />
                   {form.gstNumber && (
-                    <p className={`mt-1 text-xs ${isValidGstinFormat(form.gstNumber) ? "text-success" : "text-warning"}`}>
+                    <p
+                      className={`mt-1 text-xs ${isValidGstinFormat(form.gstNumber) ? "text-success" : "text-warning"}`}
+                    >
                       {isValidGstinFormat(form.gstNumber)
-                        ? `Looks valid · ${gstStateFromGstin(form.gstNumber) ?? "unknown state code"}`
-                        : "Doesn't match the standard 15-character GSTIN format — double-check it"}
+                        ? `Parece válido · ${gstStateFromGstin(form.gstNumber) ?? "código de estado desconocido"}`
+                        : "No coincide con el formato estándar de 15 caracteres del GSTIN — verifícalo"}
                     </p>
                   )}
                 </div>
                 <Field
-                  label="Default GST rate %"
+                  label="Tasa GST predeterminada %"
                   type="number"
                   min={0}
                   step="0.01"
                   value={form.defaultTaxRate}
-                  onChange={(e) => setForm((f) => ({ ...f, defaultTaxRate: Number(e.target.value) }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      defaultTaxRate: Number(e.target.value),
+                    }))
+                  }
                 />
               </div>
               <div>
                 <Field
                   label="PAN"
                   value={form.panNumber ?? ""}
-                  onChange={(e) => setForm((f) => ({ ...f, panNumber: e.target.value.toUpperCase() }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      panNumber: e.target.value.toUpperCase(),
+                    }))
+                  }
                 />
                 {form.panNumber && (
-                  <p className={`mt-1 text-xs ${isValidPanFormat(form.panNumber) ? "text-success" : "text-warning"}`}>
-                    {isValidPanFormat(form.panNumber) ? "Looks valid" : "Doesn't match the standard 10-character PAN format — double-check it"}
+                  <p
+                    className={`mt-1 text-xs ${isValidPanFormat(form.panNumber) ? "text-success" : "text-warning"}`}
+                  >
+                    {isValidPanFormat(form.panNumber)
+                      ? "Parece válido"
+                      : "No coincide con el formato estándar de 10 caracteres del PAN — verifícalo"}
                   </p>
                 )}
               </div>
@@ -276,37 +383,46 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
               })
             }
           >
-            Save tax settings
+            Guardar configuración de impuestos
           </Button>
         </div>
       </Card>
 
       <Card className="p-6">
-        <h2 className="mb-4 text-base font-semibold text-foreground">Loyalty program</h2>
+        <h2 className="mb-4 text-base font-semibold text-foreground">
+          Programa de lealtad
+        </h2>
         <div className="flex flex-col gap-4">
           <Toggle
-            label="Enable loyalty"
-            description="Customers earn points, redeemable as discounts"
+            label="Habilitar lealtad"
+            description="Los clientes ganan puntos, canjeables como descuentos"
             checked={form.loyaltyEnabled}
             onChange={(v) => setForm((f) => ({ ...f, loyaltyEnabled: v }))}
           />
           {form.loyaltyEnabled && (
             <div className="grid grid-cols-2 gap-4">
               <Field
-                label="Points earned per unit spent"
+                label="Puntos ganados por unidad gastada"
                 type="number"
                 min={0}
                 step="0.01"
                 value={form.pointsPerUnit}
-                onChange={(e) => setForm((f) => ({ ...f, pointsPerUnit: Number(e.target.value) }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    pointsPerUnit: Number(e.target.value),
+                  }))
+                }
               />
               <Field
-                label="Value of 1 point (in currency)"
+                label="Valor de 1 punto (en moneda)"
                 type="number"
                 min={0}
                 step="0.01"
                 value={form.pointValue}
-                onChange={(e) => setForm((f) => ({ ...f, pointValue: Number(e.target.value) }))}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, pointValue: Number(e.target.value) }))
+                }
               />
             </div>
           )}
@@ -320,7 +436,7 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
               })
             }
           >
-            Save loyalty settings
+            Guardar configuración de lealtad
           </Button>
         </div>
       </Card>
@@ -341,7 +457,9 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
   const [header, setHeader] = useState(settings.receiptHeader ?? "");
   const [footer, setFooter] = useState(settings.receiptFooter ?? "");
   const [autoPrint, setAutoPrint] = useState(settings.autoPrintReceipt);
-  const [autoPrintMethod, setAutoPrintMethod] = useState(settings.autoPrintMethod ?? "browser");
+  const [autoPrintMethod, setAutoPrintMethod] = useState(
+    settings.autoPrintMethod ?? "browser",
+  );
   const [usbWidth, setUsbWidth] = useState(String(settings.usbPrinterWidth));
   const [diag, setDiag] = useState<PrinterDiag | null>(null);
   const [checking, setChecking] = useState(false);
@@ -352,7 +470,12 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
     try {
       setDiag(await api.get<PrinterDiag>("/print/diagnostics"));
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not check the printer", "error");
+      show(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo verificar la impresora",
+        "error",
+      );
     } finally {
       setChecking(false);
     }
@@ -362,9 +485,12 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
     setTesting(true);
     try {
       await api.post("/print/test");
-      show("Test slip sent to the USB printer", "success");
+      show("Ticket de prueba enviado a la impresora USB", "success");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Test print failed", "error");
+      show(
+        err instanceof ApiError ? err.message : "La impresión de prueba falló",
+        "error",
+      );
     } finally {
       setTesting(false);
     }
@@ -386,32 +512,43 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
         className="flex flex-col gap-4"
       >
         <Toggle
-          label="Print automatically after every sale"
-          description="Skips the extra click on the checkout page — the receipt sends to your printer the moment a sale completes"
+          label="Imprimir automáticamente después de cada venta"
+          description="Evita el clic adicional en la página de cobro — el recibo se envía a tu impresora en el momento en que se completa una venta"
           checked={autoPrint}
           onChange={setAutoPrint}
         />
         {autoPrint && (
           <Select
-            label="Auto-print using"
+            label="Impresión automática usando"
             value={autoPrintMethod}
-            onChange={(e) => setAutoPrintMethod(e.target.value as "browser" | "usb")}
+            onChange={(e) =>
+              setAutoPrintMethod(e.target.value as "browser" | "usb")
+            }
             options={[
-              { value: "browser", label: "Browser print dialog (Windows + printer driver)" },
-              { value: "usb", label: "Direct USB thermal printer (no dialog — for a Debian till)" },
+              {
+                value: "browser",
+                label:
+                  "Diálogo de impresión del navegador (Windows + controlador de impresora)",
+              },
+              {
+                value: "usb",
+                label:
+                  "Impresora térmica USB directa (sin diálogo — para una caja Debian)",
+              },
             ]}
           />
         )}
         {autoPrint && autoPrintMethod === "usb" && (
           <p className="-mt-2 text-xs text-foreground/60">
-            Sends the receipt straight to the USB printer with no pop-up. Use this on a till where the
-            browser print dialog has no printer set up — otherwise that dialog can freeze the screen after
-            each sale.
+            Envía el recibo directamente a la impresora USB sin ventana
+            emergente. Úsalo en una caja donde el diálogo de impresión del
+            navegador no tenga impresora configurada — de lo contrario ese
+            diálogo puede congelar la pantalla después de cada venta.
           </p>
         )}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="rh" className="text-sm font-medium text-foreground">
-            Receipt header (printed above the shop name)
+            Encabezado del recibo (impreso encima del nombre de la tienda)
           </label>
           <textarea
             id="rh"
@@ -423,7 +560,7 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
         </div>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="rf" className="text-sm font-medium text-foreground">
-            Receipt footer (thank-you message)
+            Pie del recibo (mensaje de agradecimiento)
           </label>
           <textarea
             id="rf"
@@ -434,45 +571,72 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
           />
         </div>
         <Select
-          label="USB printer paper width (for the 'Print via USB' button)"
+          label="Ancho de papel de la impresora USB (para el botón 'Imprimir por USB')"
           value={usbWidth}
           onChange={(e) => setUsbWidth(e.target.value)}
           options={[
-            { value: "80", label: "80mm (standard)" },
-            { value: "58", label: "58mm (compact)" },
+            { value: "80", label: "80mm (estándar)" },
+            { value: "58", label: "58mm (compacto)" },
           ]}
         />
-        <Button type="submit" className="self-start">Save receipt settings</Button>
+        <Button type="submit" className="self-start">
+          Guardar configuración del recibo
+        </Button>
       </form>
 
       {/* USB printer check — one click to see what the backend detects and to
           send a physical test slip, so a shop can confirm the printer works
           without ringing up a real sale. */}
       <div className="mt-6 border-t border-border pt-5">
-        <h3 className="text-sm font-semibold text-foreground">USB printer check</h3>
+        <h3 className="text-sm font-semibold text-foreground">
+          Verificación de impresora USB
+        </h3>
         <p className="mt-1 text-xs text-foreground/60">
-          Confirms the &ldquo;Print via USB&rdquo; button can reach a thermal printer on this machine.
+          Confirma que el botón &ldquo;Imprimir por USB&rdquo; puede alcanzar
+          una impresora térmica en esta máquina.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={checkPrinter} disabled={checking}>
-            {checking ? "Checking…" : "Check printer"}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={checkPrinter}
+            disabled={checking}
+          >
+            {checking ? "Verificando…" : "Verificar impresora"}
           </Button>
-          <Button type="button" variant="secondary" onClick={testPrint} disabled={testing}>
-            {testing ? "Printing…" : "Print test slip"}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={testPrint}
+            disabled={testing}
+          >
+            {testing ? "Imprimiendo…" : "Imprimir ticket de prueba"}
           </Button>
         </div>
         {diag && (
           <div
             className={`mt-3 rounded-lg border p-3 text-xs ${
-              diag.canPrint ? "border-success/30 bg-success/10 text-success" : "border-danger/30 bg-danger/10 text-danger"
+              diag.canPrint
+                ? "border-success/30 bg-success/10 text-success"
+                : "border-danger/30 bg-danger/10 text-danger"
             }`}
           >
             <p className="font-semibold">
-              {diag.canPrint ? "Printer detected — direct USB printing should work." : "No USB printer detected."}
+              {diag.canPrint
+                ? "Impresora detectada — la impresión USB directa debería funcionar."
+                : "No se detectó impresora USB."}
             </p>
             <ul className="mt-1.5 space-y-0.5 text-foreground/70">
-              <li>Kernel printer nodes: {diag.lpDevices.length > 0 ? diag.lpDevices.join(", ") : "none"}</li>
-              <li>USB printer-class device: {diag.libusbPrinter ? diag.libusbPrinter.id : "none"}</li>
+              <li>
+                Nodos de impresora del kernel:{" "}
+                {diag.lpDevices.length > 0
+                  ? diag.lpDevices.join(", ")
+                  : "ninguno"}
+              </li>
+              <li>
+                Dispositivo USB clase impresora:{" "}
+                {diag.libusbPrinter ? diag.libusbPrinter.id : "ninguno"}
+              </li>
               {diag.notes.map((n, i) => (
                 <li key={i}>{n}</li>
               ))}
@@ -494,12 +658,20 @@ function PasswordTab() {
     e.preventDefault();
     setBusy(true);
     try {
-      await api.post("/auth/change-password", { currentPassword: current, newPassword: next });
-      show("Password changed", "success");
+      await api.post("/auth/change-password", {
+        currentPassword: current,
+        newPassword: next,
+      });
+      show("Contraseña cambiada", "success");
       setCurrent("");
       setNext("");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not change password", "error");
+      show(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo cambiar la contraseña",
+        "error",
+      );
     } finally {
       setBusy(false);
     }
@@ -509,20 +681,22 @@ function PasswordTab() {
     <Card className="max-w-md p-6">
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field
-          label="Current password"
+          label="Contraseña actual"
           type="password"
           autoComplete="current-password"
           value={current}
           onChange={(e) => setCurrent(e.target.value)}
         />
         <Field
-          label="New password (min 8 chars)"
+          label="Nueva contraseña (mín. 8 caracteres)"
           type="password"
           autoComplete="new-password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
         />
-        <Button type="submit" disabled={busy} className="self-start">Change password</Button>
+        <Button type="submit" disabled={busy} className="self-start">
+          Cambiar contraseña
+        </Button>
       </form>
     </Card>
   );

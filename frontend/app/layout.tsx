@@ -4,6 +4,10 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { themeInitScript } from "@/lib/theme";
 
+// Créditos originales:
+// Creado por Nodedr Infotech Private Limited - https://www.nodedr.com
+// Adaptado y renombrado a LocalPos por JanSua - https://github.com/JanSua/localPos
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,24 +20,24 @@ const geistMono = Geist_Mono({
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:1994";
 const description =
-  "NodeDR POS is a free, open-source, offline-first Point of Sale and inventory management system for small retail shops. No subscription, no internet required.";
+  "LocalPos es un sistema de punto de venta y gestión de inventarios gratuito, de código abierto y con funcionamiento sin conexión para pequeñas tiendas minoristas. Sin suscripciones, no requiere internet.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "NodeDR POS | Offline-First POS & Inventory Management",
-    template: "%s | NodeDR POS",
+    default: "LocalPos | Punto de venta y gestión de inventarios sin conexión",
+    template: "%s | LocalPos",
   },
   description,
   openGraph: {
     type: "website",
-    siteName: "NodeDR POS",
-    title: "NodeDR POS | Offline-First POS & Inventory Management",
+    siteName: "LocalPos",
+    title: "LocalPos | Punto de venta y gestión de inventarios sin conexión",
     description,
   },
   twitter: {
     card: "summary",
-    title: "NodeDR POS | Offline-First POS & Inventory Management",
+    title: "LocalPos | Punto de venta y gestión de inventarios sin conexión",
     description,
   },
 };
@@ -41,17 +45,23 @@ export const metadata: Metadata = {
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "NodeDR POS",
+  name: "LocalPos",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Windows, Linux, Docker",
   description,
-  url: "https://github.com/Raktim94/nodedr-pos",
+  url: "https://github.com/JanSua/localPos",
   offers: {
     "@type": "Offer",
     price: "0",
-    priceCurrency: "USD",
+    priceCurrency: "COP",
   },
   publisher: {
+    "@type": "Organization",
+    name: "LocalPos",
+    url: "https://github.com/JanSua/localPos",
+  },
+  // Créditos al creador original
+  creator: {
     "@type": "Organization",
     name: "Nodedr Infotech Private Limited",
     url: "https://www.nodedr.com",
@@ -65,7 +75,7 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="en"
+      lang="es"
       data-theme="dark"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
