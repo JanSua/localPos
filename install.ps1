@@ -17,7 +17,14 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   exit 1
 }
 
-if (-not (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
+# Verify Docker Compose v2 is available.
+try {
+  docker compose version | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw
+  }
+}
+catch {
   Write-Error "Error: the 'docker compose' plugin was not found."
   Write-Error "Update Docker Desktop/Engine to a version that bundles Compose v2."
   exit 1
@@ -28,32 +35,56 @@ if (-not (Get-Command docker-compose -ErrorAction SilentlyContinue)) {
 # `nodedr-pos_data` Docker volume (declared in docker-compose.yml), which
 # Compose creates automatically — nothing to set up on the host for this.
 Write-Output "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
-docker-compose up -d --build
+docker compose up -d --build
+
+if ($LASTEXITCODE -ne 0) {
+  Write-Error "Error: Docker Compose failed to start the stack."
+  Write-Error "Check the logs with:"
+  Write-Error "  docker compose logs"
+  exit 1
+}
 
 # --- 3. Wait for the app to report healthy -----------------------------------
 # The backend isn't published to the host; we probe it through the frontend's
 # /api proxy on the same port the browser uses. Reads HOST_PORT from .env if
 # present (see .env.example), so this works whether or not the default port
-# was customized — nothing about this script assumes localhost-only.
-$env:HOST_PORT = (Get-Content .env -ErrorAction SilentlyContinue | Select-String -Pattern '^HOST_PORT=' | ForEach-Object { $_.Line.Split('=')[1].Trim() })
+# was customized.
+$env:HOST_PORT = (Get-Content .env -ErrorAction SilentlyContinue |
+  Select-String -Pattern '^HOST_PORT=' |
+  ForEach-Object { $_.Line.Split('=')[1].Trim() })
+
 if (-not $env:HOST_PORT) {
   $env:HOST_PORT = "1994"
 }
 
 Write-Output "Waiting for the app to come online..."
+
 $ready = $false
+
 for ($i = 1; $i -le 90; $i++) {
-  $response = Invoke-WebRequest -Uri "http://localhost:$env:HOST_PORT/api/health" -UseBasicParsing -ErrorAction SilentlyContinue
-  if ($response) {
-    $ready = $true
-    break
+  try {
+    $response = Invoke-WebRequest `
+      -Uri "http://localhost:$env:HOST_PORT/api/health" `
+      -UseBasicParsing `
+      -ErrorAction Stop
+
+    if ($response.StatusCode -eq 200) {
+      $ready = $true
+      break
+    }
   }
+  catch {
+    # The backend may still be starting or running Prisma migrations.
+    # Ignore connection errors while waiting for the service to become ready.
+  }
+
   Start-Sleep -Seconds 1
 }
 
 if (-not $ready) {
-  Write-Warning "Warning: the app didn't respond within 90s. Check the logs with:"
-  Write-Warning "  docker-compose logs"
+  Write-Warning "Warning: the app didn't respond with HTTP 200 within 90 seconds."
+  Write-Warning "Check the logs with:"
+  Write-Warning "  docker compose logs"
   exit 1
 }
 

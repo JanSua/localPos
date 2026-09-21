@@ -26,7 +26,9 @@ type Status = "starting" | "scanning" | "error";
 // on pharmacy items, CODABAR on some coupons, etc.) would silently stop
 // decoding. TRY_HARDER alone is a pure win — more thorough per-frame
 // decoding, no narrowing of what's recognized.
-const SCAN_HINTS = new Map<DecodeHintType, unknown>([[DecodeHintType.TRY_HARDER, true]]);
+const SCAN_HINTS = new Map<DecodeHintType, unknown>([
+  [DecodeHintType.TRY_HARDER, true],
+]);
 
 // Best-effort: ask the browser to keep refocusing on whatever's in frame,
 // rather than locking focus once at startup (the actual cause of "camera
@@ -43,7 +45,9 @@ function applyContinuousFocus(controls: IScannerControls) {
     // the cast. An inline `satisfies` isn't enough here, since the literal
     // is also contextually checked against the callee's own (un-extended)
     // parameter type.
-    controls.streamVideoConstraintsApply?.({ advanced: [{ focusMode: "continuous" }] } as unknown as MediaTrackConstraints);
+    controls.streamVideoConstraintsApply?.({
+      advanced: [{ focusMode: "continuous" }],
+    } as unknown as MediaTrackConstraints);
   } catch {
     // Unsupported browser/device — nothing more to do here.
   }
@@ -60,7 +64,10 @@ function applyContinuousFocus(controls: IScannerControls) {
 // looking" state, not a real failure, so it's deliberately ignored below.
 // Only a rejection of decodeFromConstraints itself (camera permission
 // denied, no camera, stream failed to start) is treated as an error.
-export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps) {
+export function CameraScannerModal({
+  onClose,
+  onScan,
+}: CameraScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onScanRef = useRef(onScan);
   const [facingMode, setFacingMode] = useState<FacingMode>("environment");
@@ -93,7 +100,7 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
       queueMicrotask(() => {
         if (cancelled) return;
         setErrorMessage(
-          "Camera access needs a secure connection (https://) or 'localhost' — browsers block it on a plain http:// network address like this one. Use the hardware barcode scanner instead, or see the README's Camera scanning section for how to enable this over your LAN."
+          "El acceso a la cámara requiere una conexión segura (https://) o 'localhost' — los navegadores lo bloquean en una dirección de red http:// simple como esta. Usa el lector de códigos de barras por hardware en su lugar, o consulta la sección de escaneo con cámara del README para saber cómo habilitarlo en tu red local.",
         );
         setStatus("error");
       });
@@ -116,7 +123,7 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
         (result) => {
           if (cancelled || !result) return;
           onScanRef.current(result.getText());
-        }
+        },
       )
       .then((c) => {
         if (cancelled) {
@@ -131,8 +138,13 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
         if (cancelled) return;
         const name = err instanceof Error ? err.name : "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-          setErrorMessage("Camera access was denied. Allow camera permission in your browser and try again.");
-        } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+          setErrorMessage(
+            "Se denegó el acceso a la cámara. Permite el permiso de cámara en tu navegador e inténtalo de nuevo.",
+          );
+        } else if (
+          name === "NotFoundError" ||
+          name === "OverconstrainedError"
+        ) {
           // OverconstrainedError here usually means this device has no
           // back/front distinction (e.g. a laptop) — retry with no facing
           // preference at all instead of just giving up.
@@ -144,7 +156,7 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
                 videoRef.current!,
                 (result) => {
                   if (!cancelled && result) onScanRef.current(result.getText());
-                }
+                },
               )
               .then((c) => {
                 if (cancelled) return c.stop();
@@ -152,12 +164,16 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
                 applyContinuousFocus(c);
                 setStatus("scanning");
               })
-              .catch(() => setErrorMessage("Could not access any camera on this device."));
+              .catch(() =>
+                setErrorMessage(
+                  "No se pudo acceder a ninguna cámara en este dispositivo.",
+                ),
+              );
             return;
           }
-          setErrorMessage("No camera was found on this device.");
+          setErrorMessage("No se encontró ninguna cámara en este dispositivo.");
         } else {
-          setErrorMessage("Could not start the camera. Please try again.");
+          setErrorMessage("No se pudo iniciar la cámara. Inténtalo de nuevo.");
         }
         setStatus("error");
       });
@@ -177,18 +193,18 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="Scan a barcode or QR code"
+      aria-label="Escanear un código de barras o QR"
     >
       <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-surface shadow-2xl">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Camera className="h-4 w-4 text-brand" aria-hidden="true" />
-            Scan barcode or QR code
+            Escanear código de barras o QR
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close scanner"
+            aria-label="Cerrar escáner"
             className="rounded-lg p-1.5 text-foreground/60 transition-colors hover:bg-surface-muted hover:text-foreground"
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -196,7 +212,13 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
         </div>
 
         <div className="relative aspect-square bg-black">
-          <video ref={videoRef} className="h-full w-full object-cover" muted playsInline autoPlay />
+          <video
+            ref={videoRef}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            autoPlay
+          />
 
           {status !== "error" && (
             <div className="pointer-events-none absolute inset-10 rounded-2xl border-2 border-brand/80 shadow-[0_0_0_2000px_rgba(0,0,0,0.35)]" />
@@ -204,15 +226,19 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
 
           {status === "starting" && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-sm font-medium text-white">
-              Starting camera…
+              Iniciando cámara…
             </div>
           )}
 
           {status === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85 p-6 text-center text-sm text-white">
               <p>{errorMessage}</p>
-              <Button type="button" variant="secondary" onClick={() => setRetryNonce((n) => n + 1)}>
-                Try again
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setRetryNonce((n) => n + 1)}
+              >
+                Reintentar
               </Button>
             </div>
           )}
@@ -220,12 +246,14 @@ export function CameraScannerModal({ onClose, onScan }: CameraScannerModalProps)
 
         <div className="flex items-center justify-between gap-3 p-4">
           <p className="text-xs text-foreground/50">
-            {status === "scanning" ? "Point the camera at a code — it scans automatically." : " "}
+            {status === "scanning"
+              ? "Apunta la cámara a un código — se escanea automáticamente."
+              : " "}
           </p>
           {canFlip && (
             <Button type="button" variant="secondary" onClick={flipCamera}>
               <RotateCw className="h-4 w-4" aria-hidden="true" />
-              Flip camera
+              Cambiar cámara
             </Button>
           )}
         </div>

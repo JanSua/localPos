@@ -35,6 +35,20 @@ services:
         - container: COOKIE_SECURE
           description:
             en_US: Set to true only when served over real HTTPS (e.g. via the optional Caddy or Cloudflare Tunnel profile). Leave false for plain local/LAN use.
+              # SQLite database administration UI.
+  # Shares the same Docker volume used by the backend.
+  # Start with: docker compose --profile db up -d
+      sqlite-web:
+        image: ghcr.io/coleifer/sqlite-web:latest
+        container_name: nodedr-pos-sqlite-web
+        restart: unless-stopped
+        profiles:
+          - db
+        command: ["sqlite_web", "-H", "0.0.0.0", "-p", "8080", "/data/pos.db"]
+        ports:
+          - "${SQLITE_WEB_PORT:-8080}:8080"
+        volumes:
+          - data:/data
       volumes:
         - container: /app/data
           description:

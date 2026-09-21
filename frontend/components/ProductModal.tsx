@@ -10,32 +10,43 @@ import { Select } from "@/components/ui/Select";
 import { Button } from "@/components/ui/Button";
 import { BarcodeDownloadPanel } from "@/components/BarcodeDownloadPanel";
 import { CameraScannerModal } from "@/components/CameraScannerModal";
-import { useCreateProduct, useProducts, useUpdateProduct } from "@/hooks/useProducts";
+import {
+  useCreateProduct,
+  useProducts,
+  useUpdateProduct,
+} from "@/hooks/useProducts";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { useToast } from "@/components/Toast";
 import { api, ApiError } from "@/lib/api";
 import { generateEan13 } from "@/lib/barcode";
 import { formatMoney } from "@/lib/format";
-import { GENERIC_PRODUCT_CATEGORIES, GST_RATES, UQC_UNITS } from "@/lib/masters";
+import {
+  GENERIC_PRODUCT_CATEGORIES,
+  GST_RATES,
+  UQC_UNITS,
+} from "@/lib/masters";
 import type { Product } from "@/lib/types";
 
 const productSchema = z.object({
-  barcode: z.string().trim().min(1, "Barcode is required"),
+  barcode: z.string().trim().min(1, "El código de barras es obligatorio"),
   sku: z.string().trim().optional(),
-  name: z.string().trim().min(1, "Product name is required"),
+  name: z.string().trim().min(1, "El nombre del producto es obligatorio"),
   category: z.string().trim().optional(),
   hsn: z.string().trim().optional(),
   unit: z.string().trim().optional(),
-  purchasePrice: z.number().min(0, "Must be 0 or more"),
-  sellingPrice: z.number().min(0, "Must be 0 or more"),
+  purchasePrice: z.number().min(0, "Debe ser 0 o más"),
+  sellingPrice: z.number().min(0, "Debe ser 0 o más"),
   taxRate: z.number().min(0).max(100),
   discountType: z.enum(["percent", "amount"]).nullable(),
-  discountValue: z.number().min(0, "Must be 0 or more"),
-  stock: z.number().int().min(0, "Must be 0 or more"),
+  discountValue: z.number().min(0, "Debe ser 0 o más"),
+  stock: z.number().int().min(0, "Debe ser 0 o más"),
 });
 type ProductForm = z.infer<typeof productSchema>;
 
-const UNIT_OPTIONS = [{ value: "", label: "No unit" }, ...UQC_UNITS.map((u) => ({ value: u.code, label: `${u.code} — ${u.name}` }))];
+const UNIT_OPTIONS = [
+  { value: "", label: "Sin unidad" },
+  ...UQC_UNITS.map((u) => ({ value: u.code, label: `${u.code} — ${u.name}` })),
+];
 
 interface TaxCodeSuggestion {
   code: string;
@@ -49,7 +60,12 @@ interface ProductModalProps {
   onClose: () => void;
 }
 
-export function ProductModal({ mode, product, initialBarcode, onClose }: ProductModalProps) {
+export function ProductModal({
+  mode,
+  product,
+  initialBarcode,
+  onClose,
+}: ProductModalProps) {
   const { show } = useToast();
   const { data: shop } = useShopSettings();
   const { data: products } = useProducts();
@@ -92,14 +108,19 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
     try {
       if (mode === "edit" && product) {
         await updateProduct.mutateAsync({ id: product.id, data: values });
-        show("Product updated", "success");
+        show("Producto actualizado", "success");
       } else {
         await createProduct.mutateAsync(values);
-        show("Product added", "success");
+        show("Producto agregado", "success");
       }
       onClose();
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not save product", "error");
+      show(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo guardar el producto",
+        "error",
+      );
     }
   }
 
@@ -127,8 +148,12 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
   }
 
   const categoryOptions = useMemo(() => {
-    const existing = new Set((products ?? []).map((p) => p.category).filter((c): c is string => !!c));
-    return Array.from(new Set([...existing, ...GENERIC_PRODUCT_CATEGORIES])).sort();
+    const existing = new Set(
+      (products ?? []).map((p) => p.category).filter((c): c is string => !!c),
+    );
+    return Array.from(
+      new Set([...existing, ...GENERIC_PRODUCT_CATEGORIES]),
+    ).sort();
   }, [products]);
 
   const [showBarcodeImage, setShowBarcodeImage] = useState(false);
@@ -142,7 +167,9 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
         return;
       }
       api
-        .get<TaxCodeSuggestion[]>(`/masters/tax-codes/search?q=${encodeURIComponent(query)}`)
+        .get<TaxCodeSuggestion[]>(
+          `/masters/tax-codes/search?q=${encodeURIComponent(query)}`,
+        )
         .then(setHsnSuggestions)
         .catch(() => setHsnSuggestions([]));
     }, 250);
@@ -163,26 +190,53 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl bg-surface p-6 shadow-xl"
       >
         <div className="mb-5 flex items-center justify-between">
-          <h2 id="product-modal-title" className="text-lg font-semibold text-foreground">
-            {mode === "edit" ? "Edit Product" : "Add New Product"}
+          <h2
+            id="product-modal-title"
+            className="text-lg font-semibold text-foreground"
+          >
+            {mode === "edit" ? "Editar Producto" : "Agregar Nuevo Producto"}
           </h2>
-          <button type="button" aria-label="Close dialog" onClick={onClose} className="text-foreground/40 hover:text-foreground">
+          <button
+            type="button"
+            aria-label="Cerrar diálogo"
+            onClick={onClose}
+            className="text-foreground/40 hover:text-foreground"
+          >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="flex flex-col gap-4">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          className="flex flex-col gap-4"
+        >
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <Field label="Barcode" autoFocus={mode === "add"} error={errors.barcode?.message} {...register("barcode")} />
+              <Field
+                label="Código de barras"
+                autoFocus={mode === "add"}
+                error={errors.barcode?.message}
+                {...register("barcode")}
+              />
             </div>
-            <Button type="button" variant="secondary" onClick={() => setCameraScannerOpen(true)} title="Scan an existing barcode with your camera">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setCameraScannerOpen(true)}
+              title="Escanea un código de barras existente con tu cámara"
+            >
               <Camera className="h-4 w-4" aria-hidden="true" />
-              Scan
+              Escanear
             </Button>
-            <Button type="button" variant="secondary" onClick={generateBarcode} title="Generate a barcode for a product that doesn't have one">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={generateBarcode}
+              title="Genera un código de barras para un producto que no tiene uno"
+            >
               <BarcodeIcon className="h-4 w-4" aria-hidden="true" />
-              Generate
+              Generar
             </Button>
           </div>
           {cameraScannerOpen && (
@@ -190,7 +244,10 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
               onClose={() => setCameraScannerOpen(false)}
               onScan={(code) => {
                 setCameraScannerOpen(false);
-                setValue("barcode", code, { shouldValidate: true, shouldDirty: true });
+                setValue("barcode", code, {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
               }}
             />
           )}
@@ -201,7 +258,9 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
                 onClick={() => setShowBarcodeImage((v) => !v)}
                 className="text-sm font-medium text-brand hover:underline"
               >
-                {showBarcodeImage ? "Hide barcode image" : "Get barcode image to print (PNG/JPG)"}
+                {showBarcodeImage
+                  ? "Ocultar imagen del código de barras"
+                  : "Obtener imagen del código de barras para imprimir (PNG/JPG)"}
               </button>
               {showBarcodeImage && (
                 <div className="mt-3">
@@ -210,24 +269,40 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
               )}
             </div>
           )}
-          <Field label="Product name" error={errors.name?.message} {...register("name")} />
+          <Field
+            label="Nombre del producto"
+            error={errors.name?.message}
+            {...register("name")}
+          />
           <div>
             <Field
-              label="SKU (optional)"
-              placeholder="Links this product to an external system"
+              label="SKU (opcional)"
+              placeholder="Vincula este producto a un sistema externo"
               error={errors.sku?.message}
               {...register("sku")}
             />
             <p className="mt-1 text-xs text-foreground/50">
-              Used to match this product against an e-commerce storefront over the External Stock API — see Settings
-              → Integrations. Leave blank if this product isn&apos;t sold anywhere else.
+              Se usa para emparejar este producto con una tienda de comercio
+              electrónico a través de la API de Stock Externo — consulta
+              Configuración → Integraciones. Déjalo en blanco si este producto
+              no se vende en ningún otro lugar.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Category" list="category-options" {...register("category")} />
-            <Select label="Unit" options={UNIT_OPTIONS} {...register("unit")} />
+            <Field
+              label="Categoría"
+              list="category-options"
+              {...register("category")}
+            />
+            <Select
+              label="Unidad"
+              options={UNIT_OPTIONS}
+              {...register("unit")}
+            />
           </div>
-          {gst && <Field label="HSN / SAC" list="hsn-options" {...register("hsn")} />}
+          {gst && (
+            <Field label="HSN / SAC" list="hsn-options" {...register("hsn")} />
+          )}
           <datalist id="category-options">
             {categoryOptions.map((c) => (
               <option key={c} value={c} />
@@ -242,7 +317,7 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
           </datalist>
           <div className="grid grid-cols-2 gap-4">
             <Field
-              label="Purchase price"
+              label="Precio de compra"
               type="number"
               step="0.01"
               min={0}
@@ -250,7 +325,7 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
               {...register("purchasePrice", { valueAsNumber: true })}
             />
             <Field
-              label="Selling price"
+              label="Precio de venta"
               type="number"
               step="0.01"
               min={0}
@@ -260,15 +335,17 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">
-              Standing discount (applied automatically at checkout)
+              Descuento permanente (aplicado automáticamente al cobrar)
             </label>
             <div className="flex gap-2">
               <select
-                aria-label="Discount type"
+                aria-label="Tipo de descuento"
                 className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground"
-                {...register("discountType", { setValueAs: (v) => (v === "" ? null : v) })}
+                {...register("discountType", {
+                  setValueAs: (v) => (v === "" ? null : v),
+                })}
               >
-                <option value="">None</option>
+                <option value="">Ninguno</option>
                 <option value="percent">%</option>
                 <option value="amount">{sym}</option>
               </select>
@@ -277,20 +354,26 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
                 min={0}
                 step="0.01"
                 disabled={!discountType}
-                placeholder="Discount value"
-                aria-label="Discount value"
+                placeholder="Valor del descuento"
+                aria-label="Valor del descuento"
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground disabled:opacity-50"
                 {...register("discountValue", { valueAsNumber: true })}
               />
             </div>
-            {errors.discountValue?.message && <p className="mt-1 text-sm text-danger">{errors.discountValue.message}</p>}
+            {errors.discountValue?.message && (
+              <p className="mt-1 text-sm text-danger">
+                {errors.discountValue.message}
+              </p>
+            )}
             {discountType && discountValue > 0 && (
-              <p className="mt-1 text-xs text-success">Sells at {formatMoney(discountedPrice, sym)}</p>
+              <p className="mt-1 text-xs text-success">
+                Se vende a {formatMoney(discountedPrice, sym)}
+              </p>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Field
-              label="Stock quantity"
+              label="Cantidad en stock"
               type="number"
               min={0}
               autoFocus={mode === "edit"}
@@ -299,7 +382,7 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
             />
             {gst && (
               <Field
-                label="GST rate %"
+                label="Tasa GST %"
                 type="number"
                 min={0}
                 step="0.01"
@@ -314,7 +397,12 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
                 <button
                   key={rate}
                   type="button"
-                  onClick={() => setValue("taxRate", rate, { shouldValidate: true, shouldDirty: true })}
+                  onClick={() =>
+                    setValue("taxRate", rate, {
+                      shouldValidate: true,
+                      shouldDirty: true,
+                    })
+                  }
                   className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
                     taxRate === rate
                       ? "border-brand bg-brand text-brand-foreground"
@@ -329,10 +417,10 @@ export function ProductModal({ mode, product, initialBarcode, onClose }: Product
 
           <div className="mt-2 flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {mode === "edit" ? "Save changes" : "Add product"}
+              {mode === "edit" ? "Guardar cambios" : "Agregar producto"}
             </Button>
           </div>
         </form>

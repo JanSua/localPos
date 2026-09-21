@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from "react";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Card } from "@/components/ui/Card";
@@ -19,10 +25,14 @@ interface PasswordConfirmContextValue {
   // failure of the underlying action), the error shows inline and the
   // prompt stays open for another try. Resolves with onSubmit's return
   // value on success, or `undefined` if they cancel.
-  withPasswordConfirm: <T,>(actionLabel: string, onSubmit: (password: string) => Promise<T>) => Promise<T | undefined>;
+  withPasswordConfirm: <T>(
+    actionLabel: string,
+    onSubmit: (password: string) => Promise<T>,
+  ) => Promise<T | undefined>;
 }
 
-const PasswordConfirmContext = createContext<PasswordConfirmContextValue | null>(null);
+const PasswordConfirmContext =
+  createContext<PasswordConfirmContextValue | null>(null);
 
 export function PasswordConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
@@ -35,9 +45,13 @@ export function PasswordConfirmProvider({ children }: { children: ReactNode }) {
       new Promise<T | undefined>((resolve) => {
         setPassword("");
         setError(null);
-        setPending({ actionLabel, onSubmit, resolve: resolve as (value: unknown) => void });
+        setPending({
+          actionLabel,
+          onSubmit,
+          resolve: resolve as (value: unknown) => void,
+        });
       }),
-    []
+    [],
   );
 
   function cancel() {
@@ -55,7 +69,11 @@ export function PasswordConfirmProvider({ children }: { children: ReactNode }) {
       pending.resolve(result);
       setPending(null);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "That didn't work — try again");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Eso no funcionó — inténtalo de nuevo",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -72,13 +90,18 @@ export function PasswordConfirmProvider({ children }: { children: ReactNode }) {
           aria-labelledby="password-confirm-title"
         >
           <Card className="w-full max-w-sm p-6">
-            <h2 id="password-confirm-title" className="text-base font-semibold text-foreground">
-              Confirm your password
+            <h2
+              id="password-confirm-title"
+              className="text-base font-semibold text-foreground"
+            >
+              Confirma tu contraseña
             </h2>
-            <p className="mt-1 text-sm text-foreground/60">Re-enter your password to {pending.actionLabel}.</p>
+            <p className="mt-1 text-sm text-foreground/60">
+              Vuelve a ingresar tu contraseña para {pending.actionLabel}.
+            </p>
             <form onSubmit={submit} className="mt-4 flex flex-col gap-3">
               <Field
-                label="Password"
+                label="Contraseña"
                 type="password"
                 autoFocus
                 autoComplete="current-password"
@@ -87,11 +110,21 @@ export function PasswordConfirmProvider({ children }: { children: ReactNode }) {
                 error={error ?? undefined}
               />
               <div className="mt-1 flex gap-3">
-                <Button type="button" variant="secondary" className="flex-1" onClick={cancel} disabled={submitting}>
-                  Cancel
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={cancel}
+                  disabled={submitting}
+                >
+                  Cancelar
                 </Button>
-                <Button type="submit" className="flex-1" disabled={submitting || !password}>
-                  {submitting ? "Confirming…" : "Confirm"}
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={submitting || !password}
+                >
+                  {submitting ? "Confirmando…" : "Confirmar"}
                 </Button>
               </div>
             </form>
@@ -104,6 +137,9 @@ export function PasswordConfirmProvider({ children }: { children: ReactNode }) {
 
 export function usePasswordConfirm() {
   const ctx = useContext(PasswordConfirmContext);
-  if (!ctx) throw new Error("usePasswordConfirm must be used within a PasswordConfirmProvider");
+  if (!ctx)
+    throw new Error(
+      "usePasswordConfirm must be used within a PasswordConfirmProvider",
+    );
   return ctx;
 }

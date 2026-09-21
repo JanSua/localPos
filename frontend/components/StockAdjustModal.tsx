@@ -10,7 +10,13 @@ import type { Product } from "@/lib/types";
 
 // Fast counter-side restock: add/remove units without opening the full
 // product form. Useful when a delivery comes in or a shelf count is off.
-export function StockAdjustModal({ product, onClose }: { product: Product; onClose: () => void }) {
+export function StockAdjustModal({
+  product,
+  onClose,
+}: {
+  product: Product;
+  onClose: () => void;
+}) {
   const [mode, setMode] = useState<"add" | "remove">("add");
   const [amount, setAmount] = useState("");
   const updateProduct = useUpdateProduct();
@@ -31,15 +37,23 @@ export function StockAdjustModal({ product, onClose }: { product: Product; onClo
     e.preventDefault();
     const n = Number(amount);
     if (!Number.isFinite(n) || n <= 0) {
-      show("Enter a quantity greater than 0", "error");
+      show("Ingresa una cantidad mayor a 0", "error");
       return;
     }
     try {
-      await updateProduct.mutateAsync({ id: product.id, data: { stock: resultStock } });
-      show(`Stock updated: ${product.name} → ${resultStock}`, "success");
+      await updateProduct.mutateAsync({
+        id: product.id,
+        data: { stock: resultStock },
+      });
+      show(`Stock actualizado: ${product.name} → ${resultStock}`, "success");
       onClose();
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not update stock", "error");
+      show(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo actualizar el stock",
+        "error",
+      );
     }
   }
 
@@ -57,16 +71,27 @@ export function StockAdjustModal({ product, onClose }: { product: Product; onClo
         className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-xl"
       >
         <div className="mb-5 flex items-center justify-between">
-          <h2 id="stock-modal-title" className="text-lg font-semibold text-foreground">
-            Adjust Stock
+          <h2
+            id="stock-modal-title"
+            className="text-lg font-semibold text-foreground"
+          >
+            Ajustar Stock
           </h2>
-          <button type="button" aria-label="Close dialog" onClick={onClose} className="text-foreground/40 hover:text-foreground">
+          <button
+            type="button"
+            aria-label="Cerrar diálogo"
+            onClick={onClose}
+            className="text-foreground/40 hover:text-foreground"
+          >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
         <p className="mb-4 text-sm text-foreground/70">
-          {product.name} <span className="text-foreground/40">· currently {product.stock} in stock</span>
+          {product.name}{" "}
+          <span className="text-foreground/40">
+            · actualmente {product.stock} en stock
+          </span>
         </p>
 
         <form onSubmit={submit} className="flex flex-col gap-4">
@@ -75,27 +100,34 @@ export function StockAdjustModal({ product, onClose }: { product: Product; onClo
               type="button"
               onClick={() => setMode("add")}
               className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                mode === "add" ? "border-brand bg-brand text-brand-foreground" : "border-border text-foreground/70 hover:bg-surface-muted"
+                mode === "add"
+                  ? "border-brand bg-brand text-brand-foreground"
+                  : "border-border text-foreground/70 hover:bg-surface-muted"
               }`}
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
-              Add stock
+              Agregar stock
             </button>
             <button
               type="button"
               onClick={() => setMode("remove")}
               className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                mode === "remove" ? "border-danger bg-danger text-white" : "border-border text-foreground/70 hover:bg-surface-muted"
+                mode === "remove"
+                  ? "border-danger bg-danger text-white"
+                  : "border-border text-foreground/70 hover:bg-surface-muted"
               }`}
             >
               <Minus className="h-4 w-4" aria-hidden="true" />
-              Remove stock
+              Quitar stock
             </button>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="stock-amount" className="text-sm font-medium text-foreground">
-              Quantity to {mode === "add" ? "add" : "remove"}
+            <label
+              htmlFor="stock-amount"
+              className="text-sm font-medium text-foreground"
+            >
+              Cantidad a {mode === "add" ? "agregar" : "quitar"}
             </label>
             <input
               id="stock-amount"
@@ -109,15 +141,16 @@ export function StockAdjustModal({ product, onClose }: { product: Product; onClo
           </div>
 
           <div className="rounded-lg bg-surface-muted px-3 py-2 text-sm text-foreground/70">
-            New stock will be <span className="font-semibold text-foreground">{resultStock}</span>
+            El nuevo stock será{" "}
+            <span className="font-semibold text-foreground">{resultStock}</span>
           </div>
 
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={onClose}>
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" disabled={updateProduct.isPending}>
-              Save
+              Guardar
             </Button>
           </div>
         </form>

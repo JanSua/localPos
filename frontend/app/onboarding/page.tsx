@@ -17,27 +17,31 @@ import { useCurrencies } from "@/hooks/useShopSettings";
 import { api, ApiError } from "@/lib/api";
 
 const accountSchema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
-  email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  password: z.string().min(8, "Use at least 8 characters"),
+  name: z.string().trim().min(1, "El nombre es obligatorio"),
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email("Ingresa un correo electrónico válido"),
+  password: z.string().min(8, "Usa al menos 8 caracteres"),
 });
 type AccountForm = z.infer<typeof accountSchema>;
 
 const shopSchema = z.object({
-  shopName: z.string().trim().min(1, "Shop name is required"),
-  address1: z.string().trim().min(1, "Address is required"),
+  shopName: z.string().trim().min(1, "El nombre de la tienda es obligatorio"),
+  address1: z.string().trim().min(1, "La dirección es obligatoria"),
   address2: z.string().trim().optional(),
   city: z.string().trim().optional(),
   state: z.string().trim().optional(),
   phone: z.string().trim().optional(),
-  currencyCode: z.string().min(1, "Choose a currency"),
+  currencyCode: z.string().min(1, "Elige una moneda"),
   lowStockAlert: z.number().int().min(0),
   gstNumber: z.string().trim().optional(),
   defaultTaxRate: z.number().min(0).max(100),
 });
 type ShopForm = z.infer<typeof shopSchema>;
 
-const STEPS = ["Account", "Company", "Done"] as const;
+const STEPS = ["Cuenta", "Empresa", "Listo"] as const;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -47,12 +51,16 @@ export default function OnboardingPage() {
   const [gstEnabled, setGstEnabled] = useState(false);
   const [loyaltyEnabled, setLoyaltyEnabled] = useState(false);
 
-  const currencyOptions = Object.entries(currencies ?? {}).map(([value, c]) => ({
-    value,
-    label: `${c.symbol} ${c.label} (${value})`,
-  }));
+  const currencyOptions = Object.entries(currencies ?? {}).map(
+    ([value, c]) => ({
+      value,
+      label: `${c.symbol} ${c.label} (${value})`,
+    }),
+  );
 
-  const accountForm = useForm<AccountForm>({ resolver: zodResolver(accountSchema) });
+  const accountForm = useForm<AccountForm>({
+    resolver: zodResolver(accountSchema),
+  });
   const shopForm = useForm<ShopForm>({
     resolver: zodResolver(shopSchema),
     defaultValues: { currencyCode: "INR", lowStockAlert: 5, defaultTaxRate: 0 },
@@ -64,7 +72,11 @@ export default function OnboardingPage() {
       await api.post("/auth/register", values);
       setStep(1);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : "Could not create the admin account");
+      setServerError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo crear la cuenta de administrador",
+      );
     }
   }
 
@@ -81,7 +93,11 @@ export default function OnboardingPage() {
       });
       setStep(2);
     } catch (err) {
-      setServerError(err instanceof ApiError ? err.message : "Could not save company settings");
+      setServerError(
+        err instanceof ApiError
+          ? err.message
+          : "No se pudo guardar la configuración de la empresa",
+      );
     }
   }
 
@@ -89,12 +105,24 @@ export default function OnboardingPage() {
     <main className="flex min-h-screen flex-1 flex-col items-center justify-center gap-6 bg-background px-4 py-10">
       <Card className="w-full max-w-lg p-8">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Image src="/logo.png" alt="nodedr-pos" width={64} height={64} className="h-16 w-16 rounded-full" priority />
-          <h1 className="text-xl font-semibold text-foreground">Bienvenido a localPos</h1>
+          <Image
+            src="/logo.png"
+            alt="nodedr-pos"
+            width={64}
+            height={64}
+            className="h-16 w-16 rounded-full"
+            priority
+          />
+          <h1 className="text-xl font-semibold text-foreground">
+            Bienvenido a localPos
+          </h1>
           <p className="text-sm text-foreground/60">Configuremos la tienda.</p>
         </div>
 
-        <ol className="mb-8 flex items-center justify-center gap-2" aria-label="Onboarding progress">
+        <ol
+          className="mb-8 flex items-center justify-center gap-2"
+          aria-label="Progreso de configuración"
+        >
           {STEPS.map((label, i) => (
             <li key={label} className="flex items-center gap-2">
               <span
@@ -107,58 +135,104 @@ export default function OnboardingPage() {
                 }`}
                 aria-current={i === step ? "step" : undefined}
               >
-                {i < step ? <Check className="h-4 w-4" aria-hidden="true" /> : i + 1}
+                {i < step ? (
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  i + 1
+                )}
               </span>
-              {i < STEPS.length - 1 && <span className="h-px w-6 bg-border" aria-hidden="true" />}
+              {i < STEPS.length - 1 && (
+                <span className="h-px w-6 bg-border" aria-hidden="true" />
+              )}
             </li>
           ))}
         </ol>
 
         {step === 0 && (
-          <form onSubmit={accountForm.handleSubmit(onAccountSubmit)} noValidate className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-foreground/70">Paso 1 — Cuenta de Administrador</h2>
-            <Field label="Your name" error={accountForm.formState.errors.name?.message} {...accountForm.register("name")} />
+          <form
+            onSubmit={accountForm.handleSubmit(onAccountSubmit)}
+            noValidate
+            className="flex flex-col gap-4"
+          >
+            <h2 className="text-sm font-semibold text-foreground/70">
+              Paso 1 — Cuenta de Administrador
+            </h2>
             <Field
-              label="Email"
+              label="Tu nombre"
+              error={accountForm.formState.errors.name?.message}
+              {...accountForm.register("name")}
+            />
+            <Field
+              label="Correo electrónico"
               type="email"
               autoComplete="email"
               error={accountForm.formState.errors.email?.message}
               {...accountForm.register("email")}
             />
             <Field
-              label="Password"
+              label="Contraseña"
               type="password"
               autoComplete="new-password"
               error={accountForm.formState.errors.password?.message}
               {...accountForm.register("password")}
             />
             <p className="-mt-2 text-xs text-foreground/50">
-              There&apos;s no &quot;forgot password&quot; for this account — it lives only on this
-              machine. Write it down or save it in a password manager.
+              No hay &quot;recuperar contraseña&quot; para esta cuenta — vive
+              únicamente en esta máquina. Anótala o guárdala en un gestor de
+              contraseñas.
             </p>
-            {serverError && <p role="alert" className="text-sm text-danger">{serverError}</p>}
-            <Button type="submit" disabled={accountForm.formState.isSubmitting} className="mt-2 w-full">
-              Continue
+            {serverError && (
+              <p role="alert" className="text-sm text-danger">
+                {serverError}
+              </p>
+            )}
+            <Button
+              type="submit"
+              disabled={accountForm.formState.isSubmitting}
+              className="mt-2 w-full"
+            >
+              Continuar
             </Button>
           </form>
         )}
 
         {step === 1 && (
-          <form onSubmit={shopForm.handleSubmit(onShopSubmit)} noValidate className="flex flex-col gap-4">
-            <h2 className="text-sm font-semibold text-foreground/70">Step 2 — Company details</h2>
-            <Field label="Shop name" error={shopForm.formState.errors.shopName?.message} {...shopForm.register("shopName")} />
-            <Field label="Address line 1" error={shopForm.formState.errors.address1?.message} {...shopForm.register("address1")} />
-            <Field label="Address line 2" {...shopForm.register("address2")} />
+          <form
+            onSubmit={shopForm.handleSubmit(onShopSubmit)}
+            noValidate
+            className="flex flex-col gap-4"
+          >
+            <h2 className="text-sm font-semibold text-foreground/70">
+              Paso 2 — Datos de la empresa
+            </h2>
+            <Field
+              label="Nombre de la tienda"
+              error={shopForm.formState.errors.shopName?.message}
+              {...shopForm.register("shopName")}
+            />
+            <Field
+              label="Dirección línea 1"
+              error={shopForm.formState.errors.address1?.message}
+              {...shopForm.register("address1")}
+            />
+            <Field
+              label="Dirección línea 2"
+              {...shopForm.register("address2")}
+            />
             <div className="grid grid-cols-2 gap-4">
-              <Field label="City" {...shopForm.register("city")} />
-              <Field label="State" {...shopForm.register("state")} />
+              <Field label="Ciudad" {...shopForm.register("city")} />
+              <Field label="Estado" {...shopForm.register("state")} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Phone" {...shopForm.register("phone")} />
-              <Select label="Currency" options={currencyOptions} {...shopForm.register("currencyCode")} />
+              <Field label="Teléfono" {...shopForm.register("phone")} />
+              <Select
+                label="Moneda"
+                options={currencyOptions}
+                {...shopForm.register("currencyCode")}
+              />
             </div>
             <Field
-              label="Low stock alert threshold"
+              label="Umbral de alerta de stock bajo"
               type="number"
               min={0}
               error={shopForm.formState.errors.lowStockAlert?.message}
@@ -167,20 +241,25 @@ export default function OnboardingPage() {
 
             <div className="rounded-lg border border-border p-4">
               <Toggle
-                label="Enable GST / tax"
-                description="Charge per-product GST and show a tax breakdown on bills"
+                label="Habilitar GST / impuestos"
+                description="Cobrar GST por producto y mostrar el desglose de impuestos en las facturas"
                 checked={gstEnabled}
                 onChange={setGstEnabled}
               />
               {gstEnabled && (
                 <div className="mt-4 grid grid-cols-2 gap-4">
-                  <Field label="GSTIN (optional)" {...shopForm.register("gstNumber")} />
                   <Field
-                    label="Default GST rate %"
+                    label="GSTIN (opcional)"
+                    {...shopForm.register("gstNumber")}
+                  />
+                  <Field
+                    label="Tasa GST predeterminada %"
                     type="number"
                     min={0}
                     step="0.01"
-                    {...shopForm.register("defaultTaxRate", { valueAsNumber: true })}
+                    {...shopForm.register("defaultTaxRate", {
+                      valueAsNumber: true,
+                    })}
                   />
                 </div>
               )}
@@ -188,25 +267,39 @@ export default function OnboardingPage() {
 
             <div className="rounded-lg border border-border p-4">
               <Toggle
-                label="Enable loyalty program"
-                description="Customers earn points on purchases, redeemable as discounts"
+                label="Habilitar programa de lealtad"
+                description="Los clientes ganan puntos en sus compras, canjeables como descuentos"
                 checked={loyaltyEnabled}
                 onChange={setLoyaltyEnabled}
               />
               {loyaltyEnabled && (
                 <p className="mt-3 text-xs text-foreground/50">
-                  Empieza desde 1 punto por unidad gastada. Es decir, 1 punto es = 0,1 COP, esto se puede ajustar en Configuraciones.
+                  Empieza desde 1 punto por unidad gastada. Es decir, 1 punto es
+                  = 0,1 COP, esto se puede ajustar en Configuraciones.
                 </p>
               )}
             </div>
 
-            {serverError && <p role="alert" className="text-sm text-danger">{serverError}</p>}
+            {serverError && (
+              <p role="alert" className="text-sm text-danger">
+                {serverError}
+              </p>
+            )}
             <div className="flex gap-3">
-              <Button type="button" variant="secondary" onClick={() => setStep(0)} className="flex-1">
-                Back
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setStep(0)}
+                className="flex-1"
+              >
+                Atrás
               </Button>
-              <Button type="submit" disabled={shopForm.formState.isSubmitting} className="flex-1">
-                Continue
+              <Button
+                type="submit"
+                disabled={shopForm.formState.isSubmitting}
+                className="flex-1"
+              >
+                Continuar
               </Button>
             </div>
           </form>
@@ -217,9 +310,16 @@ export default function OnboardingPage() {
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
               <Check className="h-7 w-7 text-success" aria-hidden="true" />
             </span>
-            <h2 className="text-lg font-semibold text-foreground">Ya estás listo.</h2>
-            <p className="text-sm text-foreground/60">La tienda ha sido configurada y está lista para empezar a vender.</p>
-            <Button className="mt-2 w-full" onClick={() => router.replace("/dashboard")}>
+            <h2 className="text-lg font-semibold text-foreground">
+              Ya estás listo.
+            </h2>
+            <p className="text-sm text-foreground/60">
+              La tienda ha sido configurada y está lista para empezar a vender.
+            </p>
+            <Button
+              className="mt-2 w-full"
+              onClick={() => router.replace("/dashboard")}
+            >
               Ir al Inicio
             </Button>
           </div>
