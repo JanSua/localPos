@@ -24,10 +24,28 @@ if ! docker compose version >/dev/null 2>&1; then
   exit 1
 fi
 
+# Keep the database credential in the ignored .env file so reinstalling or
+# updating the stack never changes credentials for an existing data volume.
+if [ ! -f .env ]; then
+  cp .env.example .env
+fi
+
+if ! grep -q '^POSTGRES_PASSWORD=.' .env; then
+  if ! command -v openssl >/dev/null 2>&1; then
+    echo "Error: openssl is required to generate a PostgreSQL password." >&2
+    exit 1
+  fi
+  postgres_password="$(openssl rand -hex 32)"
+  if grep -q '^POSTGRES_PASSWORD=' .env; then
+    sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=${postgres_password}/" .env
+  else
+    printf '\nPOSTGRES_PASSWORD=%s\n' "$postgres_password" >> .env
+  fi
+fi
+
 # --- 2. Build the images and start the stack --------------------------------
-# The SQLite database and the auto-generated session secret persist in the
-# `nodedr-pos_data` Docker volume (declared in docker-compose.yml), which
-# Compose creates automatically — nothing to set up on the host for this.
+# PostgreSQL and the session secret use separate persistent Docker volumes.
+# The installer intentionally preserves the generated password across runs.
 echo "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
 docker compose up -d --build
 

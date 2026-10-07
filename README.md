@@ -8,15 +8,13 @@
 [![Docker Compose](https://img.shields.io/badge/deploy-docker%20compose-2496ED?logo=docker&logoColor=white)](docker-compose.yml)
 [![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](backend/Dockerfile)
 [![Offline-first](https://img.shields.io/badge/offline--first-yes-success)](#)
-[![Windows 10/11](https://img.shields.io/badge/Windows%2010%2F11-installer%20ready-0078D6?logo=windows11&logoColor=white)](packaging/windows/README.md)
-[![Debian/Ubuntu](https://img.shields.io/badge/Debian%2FUbuntu-.deb%20ready-A81D33?logo=debian&logoColor=white)](packaging/README.md)
 [![CasaOS / ZimaOS](https://img.shields.io/badge/CasaOS%20%2F%20ZimaOS-one--click%20app-1F6FEB)](casaos/README.md)
 
 A free, open-source, **offline-first** Point of Sale and inventory
 management system for small retail shops. It runs entirely via Docker
 Compose, so by default it lives on a machine in the shop — no internet
 connection required, no subscription, no data ever leaving the premises.
-It's also just a portable two-container stack, so if you'd rather manage
+It's also a portable Docker Compose stack, so if you'd rather manage
 it remotely, the identical setup runs on any VPS/cloud provider too — see
 [Where to run it](#where-to-run-it) for the trade-offs either way.
 
@@ -31,25 +29,19 @@ tablet/phone on the same network.
 
 ## Get NodeDR POS
 
-Four ways to install, all built from the same code and pointed at the same
+Two ways to install, both built from the same code and pointed at the same
 `http://<machine>:1994` register — pick whichever fits your till.
 
 | Platform | Status | Install | What it needs |
 | --- | --- | --- | --- |
-| 🪟 **Windows 10/11** (64-bit) | ✅ Done — built & smoke-tested on CI | [Download the installer](https://github.com/Raktim94/nodedr-pos/releases/latest/download/nodedr-pos-setup-latest-x64.exe), run it, done | Nothing — no Docker, no Node.js. Installs as two Windows services (auto-start, no login required) |
-| 🐧 **Debian / Ubuntu** | ✅ Done — built & tested on Debian 13 / Ubuntu 24.04 | `sudo apt install ./`[`nodedr-pos-latest-amd64.deb`](https://github.com/Raktim94/nodedr-pos/releases/latest/download/nodedr-pos-latest-amd64.deb) | Nothing — no Docker. Installs as a `systemd` service (`nodedr-pos doctor\|backup\|restore\|logs` CLI included) |
-| 🐳 **Docker Compose** (any OS) | ✅ Done — the original, most-used path | `git clone` + `./install.sh` (see [Quick start](#quick-start)) | Docker |
-| 🏠 **CasaOS / ZimaOS** | ✅ Ready to install now, official app store submission pending | Install from a compose URL — see [`casaos/README.md`](casaos/README.md) | Nothing — CasaOS/ZimaOS pulls pre-built images, no build step |
+| 🐳 **Docker Compose** (Windows, Linux, VPS) | Supported | `git clone` + `./install.sh` or `.\install.ps1` (see [Quick start](#quick-start)) | Docker Engine / Desktop |
+| 🏠 **CasaOS / ZimaOS** | Development preview | Install from a compose URL — see [`casaos/README.md`](casaos/README.md) | CasaOS/ZimaOS pulls pre-built images |
 
-All four set up USB thermal-printer support out of the box on Linux (kernel
+Both set up USB thermal-printer support out of the box on Linux (kernel
 `usblp` transport, no driver install) and honor the same GST-inclusive
 pricing, dues, loyalty, and returns logic — see [Features](#features) for the
-full list. Full installer docs live in
-[`packaging/README.md`](packaging/README.md) (`.deb`),
-[`packaging/windows/README.md`](packaging/windows/README.md) (`.exe`), and
-[`casaos/README.md`](casaos/README.md) (CasaOS/ZimaOS),
-including build-from-source steps, what gets installed where, and
-troubleshooting.
+full list. Native Windows and Debian installers are temporarily withdrawn
+while the app transitions to PostgreSQL.
 
 ## Screenshots
 
@@ -72,8 +64,6 @@ troubleshooting.
 - [Architecture](#architecture)
 - [Tech stack](#tech-stack)
 - [Quick start (Docker Compose)](#quick-start)
-- [Native install — Windows 10/11](#native-install--windows-1011)
-- [Native install — Debian/Ubuntu](#native-install--debianubuntu)
 - [Where to run it](#where-to-run-it)
 - [Hardware setup](#hardware-setup)
 - [Reference data & validation](#reference-data--validation)
@@ -83,7 +73,7 @@ troubleshooting.
 - [Backing up your data](#backing-up-your-data)
 - [Resetting / clearing data](#resetting--clearing-data)
 - [Project structure](#project-structure)
-- [Local development (without Docker)](#local-development-without-docker)
+- [Local development (backend/frontend without Docker)](#local-development-backendfrontend-without-docker)
 - [API overview](#api-overview)
 - [External Stock API (e-commerce integration)](#external-stock-api-e-commerce-integration)
 - [Security](#security)
@@ -127,7 +117,7 @@ troubleshooting.
   per customer (separate from an udhaar due) and spendable on any future
   purchase with a tap of **Use store credit** at checkout. See
   [Returns & exchanges](#returns--exchanges).
-- **Runs on your own hardware or in the cloud** — it's a two-container
+- **Runs on your own hardware or in the cloud** — it's a three-service
   Docker Compose stack, so the same `docker compose up` that runs it on a
   shop's counter machine also runs it unmodified on any VPS/cloud
   provider, if you'd rather manage it remotely or across locations. See
@@ -181,7 +171,7 @@ troubleshooting.
 
 ```
   Browser / LAN tablet
-        │  http://<machine>:1994   (the ONLY exposed port)
+        │  http://<machine>:1994   (the app port)
         ▼
 ┌──────────────────────┐   /api/* proxied server-side   ┌──────────────────────┐
 │   frontend  :1994    │ ──────────────────────────────▶ │  backend (internal)  │
@@ -189,8 +179,8 @@ troubleshooting.
 └──────────────────────┘   (internal Docker network)      └──────────┬───────────┘
                                                                       │
                                                                       ▼
-                                                        SQLite (nodedr-pos_data)
-                                                        (named Docker volume)
+                                                         PostgreSQL (db)
+                                                         private network
 ```
 
 Receipts print through the browser's own print dialog (a hidden iframe that
@@ -199,7 +189,7 @@ calls `window.print()`), download as a server-generated PDF, or — via
 from the backend, which is the one place in this app that does need
 scoped hardware access (see [printing & receipts](#printing--receipts)).
 
-**One port, one origin.** The browser only ever talks to the frontend on
+**One public app port, one origin.** The browser only ever talks to the frontend on
 port **1994**. The Next.js server proxies every `/api/*` request to the
 backend over the internal Docker network — the backend is **not** published
 to the host at all. This means:
@@ -209,15 +199,10 @@ to the host at all. This means:
 - session cookies are first-party, so there's no cross-origin/CORS fragility;
 - the API isn't exposed on the network, shrinking the attack surface.
 
-The backend and frontend are two separate containers, neither of which needs
-elevated privileges or host device access — everything still comes up with a
-single `docker compose up`.
-
-**The same two-process split runs natively, without Docker, on the `.deb` and
-`.exe` installers** — `systemd` units on Linux, Windows services on Windows —
-each process supervised, restarted, and firewalled the same way the two
-containers are here. See [Get NodeDR POS](#get-nodedr-pos) for which install
-method fits your till.
+The frontend, backend, and PostgreSQL run as separate containers.
+PostgreSQL is bound on the host only at `127.0.0.1:15432` for local
+administration/tunnels; the backend connects over the private Compose
+network. It is not reachable from the LAN or public internet.
 
 ## Tech stack
 
@@ -226,7 +211,7 @@ method fits your till.
 | Frontend   | Next.js (App Router), React, TypeScript, Tailwind CSS     |
 | Data layer | TanStack Query, react-hook-form + Zod                    |
 | Backend    | Node.js, Express, Zod validation, helmet, rate limiting   |
-| Database   | SQLite via Prisma ORM (`better-sqlite3` driver adapter), persisted in a Docker volume |
+| Database   | PostgreSQL via Prisma ORM, persisted in a dedicated Docker volume |
 | Auth       | bcrypt hashing, HttpOnly JWT cookie, admin/cashier roles   |
 | API access | Browser → Next.js (:1994) → server-side `/api` proxy → backend |
 | Hardware   | Browser print dialog + `pdfkit` for receipts; a custom React hook for the barcode scanner |
@@ -246,9 +231,11 @@ Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 git clone https://github.com/Raktim94/nodedr-pos.git && cd nodedr-pos && ./install.sh
 ```
 
-[`install.sh`](install.sh) checks that Docker is installed, builds both
-images, starts the stack, waits for the backend to report healthy, then
-prints the URL to open. Re-run it any time to rebuild after pulling updates.
+[`install.sh`](install.sh) checks Docker, creates and preserves a PostgreSQL
+password in `.env`, builds the images, starts the stack, and waits for the
+app. On Windows, run `.\install.ps1` from an elevated PowerShell. Re-run
+the appropriate installer after pulling updates; pending Prisma migrations
+are applied automatically before the backend starts.
 
 ### Manual install
 
@@ -260,20 +247,24 @@ setup), here's exactly what it does, one command at a time:
 git clone https://github.com/Raktim94/nodedr-pos.git
 cd nodedr-pos
 
-# 2. Build the backend and frontend images (multi-stage, node:24-alpine).
+# 2. Copy .env.example to .env and set POSTGRES_PASSWORD to a strong
+#    alphanumeric/hex value (the one-click installers generate it for you).
+cp .env.example .env
+sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 32)/" .env
+
+# 3. Build the backend and frontend images (multi-stage, node:24-alpine).
 #    First run takes a few minutes; later runs are cached and fast.
 docker compose build
 
-# 3. Start both containers in the background. Compose automatically
-#    creates the named volume declared in docker-compose.yml
-#    (nodedr-pos_data) the first time this runs.
+# 4. Start the services. The backend waits for PostgreSQL to become healthy
+#    and applies pending Prisma migrations before serving requests.
 docker compose up -d
 
-# 4. (optional) Watch the logs until you see "listening on port 4000"
+# 5. (optional) Watch the logs until you see "listening on port 4000"
 #    and the Next.js server ready message.
 docker compose logs -f
 
-# 5. (later) Stop the stack without deleting your data:
+# 6. (later) Stop the stack without deleting your data:
 docker compose down
 ```
 
@@ -283,10 +274,10 @@ Then open **http://localhost:1994**. The first launch walks you through:
 2. **Shop setup** — shop name, address, currency symbol, low-stock threshold.
 3. You're dropped onto the dashboard, ready to add products and sell.
 
-All data (the SQLite database and the auto-generated session secret) lives
-in the **`nodedr-pos_data` Docker volume**, not inside the containers, so it
-survives `docker compose down`, container recreation, and image rebuilds.
-It's only removed if you explicitly delete it (see
+PostgreSQL and the auto-generated session secret live in separate Docker
+volumes, so they survive `docker compose down`, container recreation, and
+image rebuilds. They are only removed if you explicitly delete the volumes
+(see
 [Resetting](#resetting--clearing-data) below).
 
 Want the web UI on a different port, or to deploy somewhere other than
@@ -294,60 +285,9 @@ Want the web UI on a different port, or to deploy somewhere other than
 `docker compose` reads it automatically. **`docker-compose.yml` itself never
 needs editing**, on a shop LAN box or a VPS alike.
 
-## Native install — Windows 10/11
-
-For a shop till that shouldn't need Docker or a terminal at all:
-
-1. Download [`nodedr-pos-setup-latest-x64.exe`](https://github.com/Raktim94/nodedr-pos/releases/latest/download/nodedr-pos-setup-latest-x64.exe)
-   and run it (needs admin — it's not code-signed yet, so Windows SmartScreen
-   shows "Windows protected your PC"; click **More info → Run anyway**).
-2. It installs two Windows services — **NodeDR POS Backend** and
-   **NodeDR POS Web Interface** — set to start automatically at boot, with no
-   one logged in. A desktop shortcut and Start Menu entry launch the register.
-3. Open `http://localhost:1994` (or `http://<till-ip>:1994` from another
-   device on the shop LAN — the installer opens the Windows Firewall for
-   port 1994 only, the internal API port stays blocked).
-
-The database lives outside `Program Files`, in `C:\ProgramData\NodeDRPOS`, so
-upgrading (installing a newer version over an older one) and uninstalling
-both leave your shop's data intact — a silent uninstall never deletes it.
-USB printing on Windows goes through the printer's own driver and the
-**Print** button (browser print dialog) rather than a raw-USB path — see
-[printing & receipts](#printing--receipts) for why direct-USB is Linux-only
-and how the two modes compare.
-
-Full details — service layout, firewall rules, upgrade/removal behavior, code
-signing status, and exactly what CI verifies before every release — are in
-[`packaging/windows/README.md`](packaging/windows/README.md).
-
-## Native install — Debian/Ubuntu
-
-For a shop till running Debian or Ubuntu, without Docker:
-
-```bash
-sudo apt install ./nodedr-pos_1.0.0_amd64.deb
-# or double-click the file in GNOME Software / Discover / GDebi
-```
-
-`postinst` creates a dedicated unprivileged service account, initializes the
-database, runs migrations, enables and starts `nodedr-pos.service`, waits for
-the port, and prints the URL — no manual step needed. Then:
-
-```bash
-nodedr-pos doctor                              # checks units, port, database, printer wiring
-curl -fsS http://localhost:1994/api/health     # {"status":"ok"}
-```
-
-USB thermal printing works out of the box via a bundled udev rule — plug in
-any ESC/POS printer and it's usable immediately, no driver install. `apt
-remove` keeps your data (`/var/lib/nodedr-pos`); `apt purge` deletes it (back
-up first with `nodedr-pos backup`). Full details — package layout, hardening,
-fleet/unattended deployment, RPM conversion — are in
-[`packaging/README.md`](packaging/README.md).
-
 ## Where to run it
 
-Because the whole app is just the two containers in `docker-compose.yml`,
+Because the whole app is just the three services in `docker-compose.yml`,
 `git clone` + `docker compose up` is *all* that's required to run it
 anywhere Docker runs — there's nothing hardcoded to a local machine.
 
@@ -357,15 +297,17 @@ anywhere Docker runs — there's nothing hardcoded to a local machine.
   nothing to keep paying for. This is what the rest of this README
   (and the [Security](#security) section) assumes: HTTP is fine because
   only the shop's trusted network can reach it. No `.env` file is required
-  for this — the built-in defaults already point at `localhost`.
+  for this — `install.sh` and `install.ps1` create one and generate the
+  database password on first run.
 - **On a VPS/cloud host, if you want it.** The identical
   `docker compose up` also runs on any VPS (DigitalOcean, Hetzner, a
   Raspberry Pi you colo, etc.) if you'd rather manage one instance
   remotely, run it from a machine you don't keep on-site, or reach it
   from more than one location. Nothing about the app is tied to a
-  specific host, and nothing in the compose file needs to change: copy
-  `.env.example` to `.env`, set `FRONTEND_ORIGIN` to your public
-  `https://` URL and `COOKIE_SECURE=true`, then `docker compose up -d`.
+  specific host: copy `.env.example` to `.env`, set `POSTGRES_PASSWORD`,
+  set `FRONTEND_ORIGIN` to your public `https://` URL and
+  `COOKIE_SECURE=true`, then run `./install.sh`. PostgreSQL remains bound
+  to localhost on the VPS and is not exposed to the public network.
   The trade-off: a VPS is reachable from the internet, not just your
   shop's LAN, so treat it like any other publicly reachable service — put
   a reverse proxy with real HTTPS in front (Caddy/Nginx + Let's Encrypt)
@@ -824,29 +766,50 @@ To pull the latest code and redeploy:
 #    cd nodedr-pos
 git pull
 
-# 2. Rebuild the images and recreate the containers with the new code.
-#    Re-running install.sh does exactly this too.
-docker compose up -d --build
+# 2. Rebuild the images, recreate services, and apply pending migrations.
+./install.sh
 ```
 
-Your data is safe across updates — the SQLite database and session secret
-live in the `nodedr-pos_data` Docker volume, entirely separate from the
-container filesystem, so rebuilding or recreating containers never touches
-them. Run `docker volume ls` to see it.
+Your data is safe across updates — PostgreSQL and the session secret live in
+separate Docker volumes, entirely separate from the container filesystem.
+After `git pull`, running `./install.sh` rebuilds/recreates the services.
+The backend runs `prisma migrate deploy` at startup, which applies only
+pending migrations. Do not remove volumes when updating.
 
 ## Backing up your data
 
-The database lives inside a Docker-managed volume rather than a plain host
-folder, so back it up via a throwaway container that mounts the volume
-read-only and copies the file out:
+Create a consistent custom-format PostgreSQL backup while the service is
+running:
 
 ```bash
-docker run --rm -v nodedr-pos_data:/data:ro -v "$PWD":/backup alpine \
-  cp /data/pos.db /backup/pos-backup-$(date +%Y%m%d).db
+./scripts/backup.sh
 ```
 
-That drops a timestamped copy of `pos.db` in your current directory on the
-host.
+On Windows, run `.\scripts\backup.ps1`. Both scripts create a timestamped
+`.dump` under `backups/` (ignored by Git). Schedule the script with cron on
+Linux/VPS or Task Scheduler on Windows, and copy backups to storage outside
+the VPS. Backups can be restored with `pg_restore` into a running PostgreSQL
+service; test restores periodically.
+
+To restore on Linux, stop the backend first, then restore the chosen dump
+and start the stack again:
+
+```bash
+docker compose stop backend
+docker compose exec -T db pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -U nodedr -d nodedrpos < backups/nodedr-pos-YYYYMMDD-HHMMSS.dump
+docker compose up -d
+```
+
+For a remote database client, create an SSH tunnel instead of opening the
+database to the network:
+
+```bash
+ssh -L 15432:127.0.0.1:15432 your-user@your-vps
+```
+
+Connect the client to `127.0.0.1:15432` with database `nodedrpos`, user
+`nodedr`, and the password from the VPS `.env`.
 
 ## Resetting / clearing data
 
@@ -855,18 +818,14 @@ go through onboarding again — useful after testing, or to start a real shop
 from a clean slate:
 
 ```bash
-# 1. Stop the stack AND remove the named volume (the -v is what deletes
-#    the database and session secret; without it, `down` only removes
-#    the containers and your data is untouched).
+# 1. Stop the stack AND remove its volumes. This deletes the database and
+#    session secret; without -v, `down` leaves your data untouched.
 docker compose down -v
 
 # 2. Start back up — a fresh volume is created automatically and
 #    you'll land on the onboarding wizard again.
 docker compose up -d
 ```
-
-To remove the volume without also touching the containers:
-`docker volume rm nodedr-pos_data` (stack must be stopped first).
 
 If you only want to clear the *catalog and sales history* but keep your
 admin login and shop settings, don't delete the files — instead delete
@@ -877,10 +836,9 @@ current admin-account-preserving "factory reset" endpoint.
 
 ```
 nodedr-pos/
-├── docker-compose.yml         # declares the nodedr-pos_data named volume
+├── docker-compose.yml         # app, PostgreSQL, and persistent volumes
 ├── docs/screenshots/          # README images
-├── casaos/                    # CasaOS/ZimaOS app store manifest + assets — see casaos/README.md
-├── packaging/                 # Windows (.exe) and Debian/Ubuntu (.deb) native installers
+├── casaos/                    # CasaOS/ZimaOS compose manifest + assets — see casaos/README.md
 ├── backend/
 │   ├── Dockerfile
 │   ├── prisma/schema.prisma  # User, ShopSettings, Product, Invoice, InvoiceItem, Return
@@ -900,14 +858,20 @@ nodedr-pos/
     └── hooks/                # useBarcodeScanner, useProducts, useCustomers, useInvoices, useReturns, useAuth, useShopSettings, useSyncStatus
 ```
 
-## Local development (without Docker)
+## Local development (backend/frontend without Docker)
 
-Run the backend and frontend in two terminals.
+Run PostgreSQL in Docker and the backend and frontend in separate terminals.
+First run `.\install.ps1` on Windows or `./install.sh` on Linux to create the
+root `.env` and its persistent PostgreSQL password. Then:
 
 ```bash
+# Start only PostgreSQL
+docker compose up -d db
+
 # Terminal 1 — backend on :4000
 cd backend
 cp .env.example .env
+# Replace <POSTGRES_PASSWORD> with POSTGRES_PASSWORD from the root .env.
 npm install
 npm run prisma:migrate:dev
 npm run dev

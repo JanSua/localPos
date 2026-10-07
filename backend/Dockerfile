@@ -1,7 +1,6 @@
 # --- deps stage ---
-# better-sqlite3 (Prisma's SQLite driver adapter) ships prebuilt musl/Alpine
-# binaries, no toolchain needed for it. `usb` (direct-USB ESC/POS printing,
-# see src/lib/escposUsb.js) also ships a prebuilt linux-x64 musl binary, but
+# `usb` (direct-USB ESC/POS printing, see src/lib/escposUsb.js) ships a
+# prebuilt linux-x64 musl binary, but
 # empirically its install script doesn't reliably skip straight to that
 # prebuild on Alpine — with no compiler present it falls through to `node-gyp
 # rebuild` and fails outright, so the toolchain below is required at install
@@ -19,6 +18,7 @@ RUN npm install --omit=dev && npm cache clean --force
 FROM node:24-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
+ENV DATABASE_URL=postgresql://nodedr:build-only@localhost:5432/nodedrpos?schema=public
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json prisma.config.js ./
 COPY prisma ./prisma

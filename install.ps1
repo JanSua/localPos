@@ -30,10 +30,42 @@ catch {
   exit 1
 }
 
-# --- 2. Build the images and start the stack --------------------------------
-# The SQLite database and the auto-generated session secret persist in the
-# `nodedr-pos_data` Docker volume (declared in docker-compose.yml), which
-# Compose creates automatically — nothing to set up on the host for this.
+# --- 2. Ensure persistent PostgreSQL credentials ----------------------------
+# Keep the password in the ignored .env file so reinstalling or updating the
+# stack never changes credentials for an existing database volume.
+$envPath = Join-Path (Get-Location) ".env"
+if (-not (Test-Path $envPath)) {
+  Copy-Item ".env.example" $envPath
+}
+
+$envContents = [System.IO.File]::ReadAllText($envPath)
+$passwordMatch = [regex]::Match($envContents, '(?m)^POSTGRES_PASSWORD=(.*)$')
+if (-not $passwordMatch.Success -or [string]::IsNullOrWhiteSpace($passwordMatch.Groups[1].Value)) {
+  $randomBytes = New-Object byte[] 32
+  $randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $randomGenerator.GetBytes($randomBytes)
+  }
+  finally {
+    $randomGenerator.Dispose()
+  }
+
+  $postgresPassword = [BitConverter]::ToString($randomBytes).Replace("-", "").ToLowerInvariant()
+  if ($passwordMatch.Success) {
+    $envContents = [regex]::Replace(
+      $envContents,
+      '(?m)^POSTGRES_PASSWORD=.*$',
+      "POSTGRES_PASSWORD=$postgresPassword"
+    )
+  }
+  else {
+    $envContents = $envContents.TrimEnd() + "`nPOSTGRES_PASSWORD=$postgresPassword`n"
+  }
+  [System.IO.File]::WriteAllText($envPath, $envContents, [System.Text.UTF8Encoding]::new($false))
+}
+
+# --- 3. Build the images and start the stack --------------------------------
+# PostgreSQL and the session secret use separate persistent Docker volumes.
 Write-Output "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
 docker compose up -d --build
 
@@ -44,7 +76,7 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
-# --- 3. Wait for the app to report healthy -----------------------------------
+# --- 4. Wait for the app to report healthy -----------------------------------
 # The backend isn't published to the host; we probe it through the frontend's
 # /api proxy on the same port the browser uses. Reads HOST_PORT from .env if
 # present (see .env.example), so this works whether or not the default port
@@ -88,7 +120,7 @@ if (-not $ready) {
   exit 1
 }
 
-# --- 4. Done ------------------------------------------------------------------
+# --- 5. Done ------------------------------------------------------------------
 Write-Output ""
 Write-Output "nodedr-pos is up and running."
 Write-Output "Open http://localhost:$env:HOST_PORT in your browser to create your admin account and finish shop setup."

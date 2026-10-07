@@ -1,13 +1,45 @@
 name: nodedr-pos
 
 services:
+  db:
+    image: postgres:17-alpine
+    container_name: nodedr-pos-db
+    hostname: db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nodedrpos
+      POSTGRES_USER: nodedr
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/postgres
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - nodedr-pos
+    x-casaos:
+      envs:
+        - container: POSTGRES_PASSWORD
+          description:
+            en_US: Set a strong password using letters and numbers; keep it safe for PostgreSQL administration and backups.
+      volumes:
+        - container: /var/lib/postgresql/data
+          description:
+            en_US: Persistent PostgreSQL database files. Back up this data using pg_dump, not by copying the live files.
+
   backend:
-    image: ghcr.io/raktim94/nodedr-pos-backend:1.1.0
+    image: ghcr.io/raktim94/nodedr-pos-backend:develop
     container_name: nodedr-pos-backend
     hostname: nodedr-pos-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: "file:/app/data/pos.db"
+      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}@db:5432/nodedrpos?schema=public"
       PORT: "4000"
       FRONTEND_ORIGIN: "http://localhost:1994"
       COOKIE_SECURE: "false"
@@ -15,50 +47,33 @@ services:
       - type: bind
         source: /DATA/AppData/$AppID/data
         target: /app/data
-      # Optional direct-USB thermal printing (see backend/src/lib/escposUsb.js).
-      # Bind-mounting the whole /dev/bus/usb tree (rather than a fixed device
-      # path, which only covers device nodes already present at container
-      # start) keeps this working across printer unplug/replug without a
-      # restart. No printer attached is completely fine too — this mount and
-      # the cgroup rules below just make one usable if/when you plug one in.
       - /dev/bus/usb:/dev/bus/usb
     device_cgroup_rules:
       - "c 189:* rmw"
       - "c 180:* rmw"
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - nodedr-pos
     x-casaos:
       envs:
         - container: FRONTEND_ORIGIN
           description:
-            en_US: Origin allowed to call the API (CORS). Leave as the default for local/offline use — only change for a VPS behind real HTTPS.
+            en_US: Origin allowed to call the API. Change this for a VPS behind HTTPS.
         - container: COOKIE_SECURE
           description:
-            en_US: Set to true only when served over real HTTPS (e.g. via the optional Caddy or Cloudflare Tunnel profile). Leave false for plain local/LAN use.
-              # SQLite database administration UI.
-  # Shares the same Docker volume used by the backend.
-  # Start with: docker compose --profile db up -d
-      sqlite-web:
-        image: ghcr.io/coleifer/sqlite-web:latest
-        container_name: nodedr-pos-sqlite-web
-        restart: unless-stopped
-        profiles:
-          - db
-        command: ["sqlite_web", "-H", "0.0.0.0", "-p", "8080", "/data/pos.db"]
-        ports:
-          - "${SQLITE_WEB_PORT:-8080}:8080"
-        volumes:
-          - data:/data
+            en_US: Set to true only when served over real HTTPS.
       volumes:
         - container: /app/data
           description:
-            en_US: SQLite database and session secret — back this up.
+            en_US: Persistent session-signing secret.
         - container: /dev/bus/usb
           description:
-            en_US: USB passthrough for optional direct-USB thermal receipt printing. Safe to leave as-is with no printer attached.
+            en_US: USB passthrough for optional direct-USB thermal receipt printing.
 
   frontend:
-    image: ghcr.io/raktim94/nodedr-pos-frontend:1.1.0
+    image: ghcr.io/raktim94/nodedr-pos-frontend:develop
     container_name: nodedr-pos-frontend
     hostname: nodedr-pos-frontend
     restart: unless-stopped
@@ -107,58 +122,26 @@ x-casaos:
       no internet connection required, no data ever leaving your home
       server — it's built to run on your own hardware and stay there.
 
-      Scan a barcode (with a USB scanner or straight from a phone/tablet
-      camera) to sell it, press Enter to check out, and print or download
-      the receipt with one click. GST-inclusive pricing with CGST/SGST
-      breakdown, per-product standing discounts, a loyalty points program,
-      customer dues ("udhaar"), and full returns/exchanges with store
-      credit are all built in.
-
       Access it from any device on your home network at
-      `http://<your-server>:1994` — the counter machine itself, or any
-      tablet/phone you use as a second till.
+      `http://<your-server>:1994`.
   tips:
     before_install:
       en_US: |
-        Your data (the SQLite database) persists at
-        `/DATA/AppData/nodedr-pos/data`, following CasaOS/ZimaOS's standard
-        backup/restore convention.
+        Set a strong PostgreSQL password during installation. The database
+        is available to the app over its private container network; its host
+        port is bound to localhost only.
 
-        On first launch you'll create an admin account and set up your shop
-        — no manual configuration needed.
-
-        Optional: for direct-USB thermal receipt printing, plug the printer
-        into the box before or after install — it's detected automatically
-        via the bundled `/dev/bus/usb` passthrough. No printer? Receipts
-        still print fine via the browser dialog or download as PDF.
+        On first launch you'll create an admin account and set up your shop.
+        Optional: direct-USB thermal receipt printing uses the bundled
+        `/dev/bus/usb` passthrough.
   index: /
   scheme: http
   port_map: "1994"
-  version: "1.1.0"
-  update_at: "2026-08-21"
+  version: "1.2.0-dev"
+  update_at: "2026-10-07"
   release_notes:
     en_US: |-
-      1.1.0 (2026-08-21):
-      - Dashboard: new "Total Due" stat and a customers-with-due section for
-        quick collections follow-up.
-      - Auth: fixed a stale-onboarding-state bug and added long-lived
-        sessions with step-up re-authentication for sensitive actions.
-      - Fixed an accidental-close bug where dragging a text selection that
-        ended outside a dialog would close it.
-      - API responses now sent with Cache-Control: no-store, so the browser
-        or a proxy in front of it never serves stale POS data.
-      - Redesigned homepage with a real "get started" account-creation path
-        (previously a bare redirect).
-      - Fixed camera barcode/QR scanning reliability: removed an overly
-        strict format restriction and improved focus/decode behavior.
-      - Fixed the Settings tab getting stuck on "Loading settings…" forever.
-      - Patched npm-audit-flagged dependency vulnerabilities.
-
-      1.0.0 (2026-08-03):
-      Initial CasaOS/ZimaOS release: offline-first POS and inventory
-      management, barcode/QR scanning (USB scanner or phone/tablet camera),
-      GST-inclusive billing, loyalty points, customer dues, and returns with
-      store credit.
+      Development preview: application data now uses PostgreSQL.
   website: "https://www.nodedr.com"
   repo: "https://github.com/Raktim94/nodedr-pos"
   support: "https://github.com/Raktim94/nodedr-pos/issues"

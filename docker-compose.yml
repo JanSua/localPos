@@ -1,6 +1,32 @@
 name: nodedr-pos
 
 services:
+  db:
+    image: postgres:17-alpine
+    container_name: nodedr-pos-db
+    hostname: db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: nodedrpos
+      POSTGRES_USER: nodedr
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+    networks:
+      - nodedr-pos
+
   backend:
     build:
       context: ./backend
@@ -11,7 +37,7 @@ services:
     restart: unless-stopped
 
     environment:
-      DATABASE_URL: "file:/app/data/pos.db"
+      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/nodedrpos?schema=public"
       PORT: "4000"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:1994}"
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
@@ -20,7 +46,7 @@ services:
       - "4000"
 
     volumes:
-      - data:/app/data
+      - app_data:/app/data
       - /dev/bus/usb:/dev/bus/usb
 
     device_cgroup_rules:
@@ -29,6 +55,10 @@ services:
 
     networks:
       - nodedr-pos
+
+    depends_on:
+      db:
+        condition: service_healthy
 
   frontend:
     build:
@@ -43,34 +73,6 @@ services:
 
     ports:
       - "1994:3000"
-
-    depends_on:
-      - backend
-
-    networks:
-      - nodedr-pos
-
-  sqlite-web:
-    image: ghcr.io/coleifer/sqlite-web:latest
-    container_name: nodedr-pos-sqlite-web
-    restart: unless-stopped
-
-    profiles:
-      - db
-
-    command:
-      - sqlite_web
-      - -H
-      - 0.0.0.0
-      - -p
-      - "8080"
-      - /data/pos.db
-
-    ports:
-      - "18743:8080"
-
-    volumes:
-      - data:/data
 
     depends_on:
       - backend
@@ -145,5 +147,6 @@ networks:
 
 
 volumes:
-  data:
+  app_data:
+  postgres_data:
   caddy_data:

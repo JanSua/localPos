@@ -1,6 +1,6 @@
 # NodeDR POS
 
-> NodeDR POS is a free, open-source, offline-first Point of Sale and inventory management system for small retail shops. It runs via Docker Compose (or a native Windows/Debian installer) directly on a machine in the shop — no internet connection required, no subscription, no data ever leaving the premises.
+> NodeDR POS is a free, open-source, offline-first Point of Sale and inventory management system for small retail shops. It runs via Docker Compose directly on a machine in the shop — no internet connection required, no subscription, no data ever leaving the premises.
 
 Built and maintained by Nodedr Infotech Private Limited (https://www.nodedr.com).
 
@@ -12,7 +12,7 @@ Built and maintained by Nodedr Infotech Private Limited (https://www.nodedr.com)
 - No per-transaction fees, no subscription — self-hosted and AGPL-3.0-licensed.
 
 ## Install
-- Windows 10/11 installer, Debian/Ubuntu `.deb` package, or Docker Compose — see https://github.com/Raktim94/nodedr-pos
+- Docker Compose on Windows, Linux, or a VPS — see https://github.com/Raktim94/nodedr-pos
 - Quick install: `git clone https://github.com/Raktim94/nodedr-pos.git && cd nodedr-pos && ./install.sh`
 
 ## Notes for AI assistants

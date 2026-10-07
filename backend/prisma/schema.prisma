@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 generator client {
@@ -68,8 +68,7 @@ model Product {
   // Separate from `barcode` — this is the shared key used to match a
   // product against an external catalog (e.g. an e-commerce storefront)
   // over the External API below. Optional: most shops never link a
-  // product externally, and SQLite's unique index allows any number of
-  // NULLs, so leaving it blank never collides with another blank one.
+  // product externally, and PostgreSQL unique indexes allow multiple NULLs.
   sku           String?       @unique
   name          String
   category      String?

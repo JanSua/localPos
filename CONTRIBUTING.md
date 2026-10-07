@@ -2,8 +2,8 @@
 
 Thanks for considering a contribution to NodeDR POS — a free, offline-first
 Point of Sale for small retail shops. This is a small, focused tool with a
-real production surface (three install paths — Docker, Windows `.exe`,
-Debian `.deb` — all shipping from the same code), so this guide covers
+real production surface (Docker Compose deployments on Windows, Linux, and
+CasaOS), so this guide covers
 environment setup, the conventions the codebase already leans on, and the
 process for issues/PRs.
 
@@ -15,7 +15,6 @@ process for issues/PRs.
 - [Project structure](#project-structure)
 - [Conventions that are not optional](#conventions-that-are-not-optional)
 - [Working on hardware features](#working-on-hardware-features)
-- [Working on the native installers](#working-on-the-native-installers)
 - [Making a change](#making-a-change)
 - [Commit messages](#commit-messages)
 - [Opening a pull request](#opening-a-pull-request)
@@ -45,7 +44,7 @@ Read the [`README.md`](./README.md) first, specifically:
 - **Architecture** — the one-port, one-origin design (browser only ever
   talks to the frontend on `:1994`; the backend is never published to the
   host) and why.
-- **Tech stack** — Next.js/Express/Prisma/SQLite, and where each piece's
+- **Tech stack** — Next.js/Express/Prisma/PostgreSQL, and where each piece's
   source of truth lives (e.g. currency symbols in
   `backend/src/lib/currency.js`, never duplicated on the frontend).
 - **Security** — the actual, verified security posture. Anything you add
@@ -59,8 +58,8 @@ see [Proposing features](#proposing-features) first.
 
 ## Development setup
 
-**Prerequisites:** Docker (for the quickest path), or Node.js 24+ and a
-way to run two terminals for local dev without Docker.
+**Prerequisites:** Docker (for the quickest path), or Node.js 24+, a
+PostgreSQL service, and a way to run two terminals for local dev.
 
 ### Option A — Docker (matches production)
 
@@ -76,10 +75,16 @@ rebuild-after-pull-changes loop while you iterate.
 
 ### Option B — local dev, no Docker (faster iteration)
 
+Start the repository's PostgreSQL container first (run the installer once
+to generate the root `.env` password):
+
 ```bash
+docker compose up -d db
+
 # Terminal 1 — backend on :4000
 cd backend
 cp .env.example .env
+# Set DATABASE_URL using POSTGRES_PASSWORD from the root .env.
 npm install
 npm run prisma:migrate:dev
 npm run dev
@@ -101,20 +106,24 @@ cd frontend && npm run lint
 cd ../backend && npm run prisma:generate   # confirms schema.prisma is valid
 ```
 
-There's no backend lint/test suite or CI beyond the Windows installer
-build workflow yet — until that changes, manually click through the
-feature you touched (see the relevant README section — POS checkout,
-returns, printing, etc.) and say what you tested in the PR description.
-A real test suite is a good first contribution if you want one.
+Before shipping a schema change, create and commit its migration with
+`npm run prisma:migrate:dev`; deployed containers apply committed migrations
+with `prisma migrate deploy` before the API starts. Never generate migrations
+in production.
+
+There's no backend lint/test suite yet — manually click through the feature
+you touched (see the relevant README section — POS checkout, returns,
+printing, etc.) and say what you tested in the PR description.
 
 ## Project structure
 
 ```
 nodedr-pos/
-├── docker-compose.yml         # declares the nodedr-pos_data named volume
+├── docker-compose.yml         # app services and persistent database volumes
 ├── install.sh                 # one-command Docker install/upgrade
+├── install.ps1                # Windows Docker install/upgrade
+├── scripts/backup.*           # PostgreSQL backup helpers
 ├── docs/screenshots/          # README images
-├── packaging/                 # .deb (Debian/Ubuntu) and .exe (Windows) installer builds
 ├── backend/
 │   ├── Dockerfile
 │   ├── prisma/schema.prisma  # User, ShopSettings, Product, Invoice, InvoiceItem, Return
@@ -186,20 +195,6 @@ read the relevant section before changing either:
   runs as root (it's required, not an oversight — don't "fix" it by
   adding a `USER` line).
 
-## Working on the native installers
-
-The Windows (`.exe`) and Debian (`.deb`) installers are built from the
-same `backend`/`frontend` source — see
-[`packaging/windows/README.md`](packaging/windows/README.md) and
-[`packaging/README.md`](packaging/README.md) for the full build process,
-service/systemd-unit layout, and what CI verifies before a release. If you
-touch `packaging/debian/copyright` or the `.nsi` script's license/version
-metadata, keep them consistent with the root [`LICENSE`](./LICENSE) — the
-`Files: *` stanza in `packaging/debian/copyright` describes *our* code and
-must match; the stanzas for the bundled Node.js runtime and vendored
-`node_modules` describe *their* actual upstream licenses and should not be
-changed to match ours.
-
 ## Making a change
 
 1. Fork the repo and branch off `master`:
@@ -244,7 +239,7 @@ Open an issue with:
 
 - What you expected vs. what happened.
 - Exact repro steps.
-- Install method (Docker / Windows `.exe` / Debian `.deb` / local dev)
+- Install method (Docker Compose / CasaOS / local dev)
   and versions (Node, OS, Docker if relevant).
 - For a printing bug: which transport (browser Print, Download PDF,
   Print via USB), printer model, and `lsusb` / `dmesg | grep usblp`

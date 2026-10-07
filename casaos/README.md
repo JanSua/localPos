@@ -12,7 +12,7 @@ compose schema).
 | `thumbnail.png` | 1568×884 store-listing banner. |
 | `screenshot-1.png` … `screenshot-3.png` | Dashboard, POS checkout, and Inventory — the same images used in the main [README](../README.md#screenshots). |
 
-## Install it right now (before official app store approval)
+## Development preview
 
 CasaOS and ZimaOS can both install directly from a compose file URL —
 you don't need to wait for this to land in the official app store:
@@ -24,25 +24,32 @@ you don't need to wait for this to land in the official app store:
    https://raw.githubusercontent.com/Raktim94/nodedr-pos/master/casaos/docker-compose.yml
    ```
 
-3. Install. CasaOS pulls the pre-built `ghcr.io/raktim94/nodedr-pos-backend`
-   and `ghcr.io/raktim94/nodedr-pos-frontend` images — there is no build
-   step, so it works even though CasaOS never touches this repo's source.
+3. Install. This preview pulls the `:develop` images from GHCR — there is
+   no build step, so it works even though CasaOS never touches this repo's
+   source. The develop images must have been published by the Docker
+   workflow before installing.
 4. Open it from the CasaOS dashboard, or go straight to
    `http://<your-casaos-box>:1994`. First launch walks you through creating
    an admin account and setting up your shop, exactly like every other
    install method.
 
-Your data (the SQLite database) persists at
-`/DATA/AppData/nodedr-pos/data` on the CasaOS box, following the same
-convention CasaOS's own backup/restore UI expects for every other app.
+PostgreSQL data persists at `/DATA/AppData/nodedr-pos/postgres`; the
+application's session-signing secret persists separately at
+`/DATA/AppData/nodedr-pos/data`. Use `pg_dump` for backups rather than
+copying the live PostgreSQL data directory. The database port is bound to
+localhost on the CasaOS host and is not exposed to the LAN.
 
-## Why two containers, and why USB device access
+## Services and USB device access
 
-NodeDR POS is a two-container app (`backend` + `frontend`), same as the
+NodeDR POS is a three-container app (`frontend`, `backend`, and `db`), same as the
 plain [`docker-compose.yml`](../docker-compose.yml) at the repo root — see
 [Architecture](../README.md#architecture) for why. The manifest declares
 `main: frontend` since that's the browsable service; CasaOS uses this to
 know which container's port to open when you click the app.
+
+Set a strong alphanumeric PostgreSQL password in the install form. For
+administration from outside the host, use an SSH tunnel to localhost port
+15432; never publish the PostgreSQL port to the public interface.
 
 The backend's `/dev/bus/usb` bind mount and `device_cgroup_rules` are for
 **optional** direct-USB thermal receipt printing (see
@@ -56,8 +63,10 @@ touch anything else on the host.
 
 ## Publishing new image versions
 
-`docker-compose.yml` here pins exact image tags (CasaOS requires pinned,
-not `:latest`, tags). To publish a new version:
+This development manifest follows the moving `:develop` image tags. The
+Docker publish workflow publishes those tags from the `develop` branch.
+For a stable CasaOS release, replace them with a versioned tag and publish
+that version before updating the manifest:
 
 1. Bump the version everywhere it's referenced — the two `image:` tags in
    this file, `version:` and `update_at:` under `x-casaos:`, and

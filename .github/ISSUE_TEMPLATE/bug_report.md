@@ -19,7 +19,7 @@ Exact steps, not "sometimes happens":
 What you expected to happen instead.
 
 **Install method**
-Docker Compose / Windows `.exe` / Debian `.deb` / local dev (no Docker)
+Docker Compose / CasaOS / local dev (Docker PostgreSQL)
 
 **Environment**
 - OS:

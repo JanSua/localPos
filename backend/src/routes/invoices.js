@@ -299,8 +299,8 @@ router.post('/', async (req, res) => {
       if (customer) {
         // totalDue ("udhaar") and creditBalance are the running balances the
         // POS reads back on the customer's next visit. They used to be kept
-        // with Prisma `increment`, which performs the addition inside SQLite's
-        // REAL (float) column — so tiny binary rounding residue accumulated
+        // with Prisma `increment`, which performs the addition in a floating-
+        // point column — so tiny binary rounding residue accumulated
         // across many bills and a fully-paid customer could keep showing e.g.
         // Rs. 0.00…03 still owing that never cleared, and reappeared on the
         // next bill. Compute the new balances in JS and round to paise so the

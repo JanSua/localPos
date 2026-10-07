@@ -25,10 +25,8 @@ function parseCsv(buffer) {
   return parse(buffer, { columns: true, skip_empty_lines: true, trim: true, bom: true }).map(lowercaseKeys);
 }
 
-// SQLite (unlike Postgres/MySQL) doesn't support Prisma's `skipDuplicates`
-// on createMany, so a messy source CSV with repeated keys would otherwise
-// crash the import on a unique-constraint error — de-dupe here instead
-// (last occurrence of a given key wins).
+// De-dupe CSV rows before chunked inserts so repeated keys in a messy source
+// file don't cause a unique-constraint error (last occurrence wins).
 async function chunkedCreateMany(model, rows, keyFn, chunkSize = 200) {
   const deduped = [...new Map(rows.map((r) => [keyFn(r), r])).values()];
   for (let i = 0; i < deduped.length; i += chunkSize) {
