@@ -190,7 +190,7 @@ from the backend, which is the one place in this app that does need
 scoped hardware access (see [printing & receipts](#printing--receipts)).
 
 **One public app port, one origin.** The browser only ever talks to the frontend on
-port **1994**. The Next.js server proxies every `/api/*` request to the
+the port configured by `HOST_PORT` (default **1994**). The Next.js server proxies every `/api/*` request to the
 backend over the internal Docker network — the backend is **not** published
 to the host at all. This means:
 
@@ -287,8 +287,13 @@ image rebuilds. They are only removed if you explicitly delete the volumes
 
 Want the web UI on a different port, or to deploy somewhere other than
 `localhost`? Copy `.env.example` to `.env` and set values there —
-`docker compose` reads it automatically. **`docker-compose.yml` itself never
-needs editing**, on a shop LAN box or a VPS alike.
+`docker compose` reads it automatically. `STORE_NAME` gives each installation
+its own Compose project, named containers, and data volumes; use a distinct
+value for every shop. The resulting containers are easy to identify, for
+example `localpos-puntoone-front` and `localpos-puntoone-back`. `HOST_PORT`
+controls the host port mapped to the frontend's internal port 3000. On a VPS,
+also set `FRONTEND_ORIGIN` to the URL users will open. **`docker-compose.yml`
+itself never needs editing**, on a shop LAN box or a VPS alike.
 
 ### Use an existing PostgreSQL server
 
@@ -324,6 +329,46 @@ Put the same password in `.env`; alphanumeric passwords are simplest to
 manage in environment files. Keep `POSTGRES_MODE=local` and the defaults on Windows development, or use
 `POSTGRES_MODE=external` there too if you already have PostgreSQL on a
 network the Windows Docker Engine can access.
+
+### Run multiple shops on one VPS
+
+Each shop runs from its own checkout (or directory) with its own `.env`.
+Choose a unique `STORE_NAME` and `HOST_PORT` for each, and give each instance
+its own PostgreSQL database and credentials. When using an existing PostgreSQL
+container, the instances can share its Docker network (`POSTGRES_NETWORK`),
+but must not share a database. Set `FRONTEND_ORIGIN` to the public origin for
+that instance so browser requests are accepted:
+
+```dotenv
+# First instance
+STORE_NAME=puntoone
+HOST_PORT=1994
+POSTGRES_MODE=external
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=puntoone
+POSTGRES_USER=puntoone
+POSTGRES_PASSWORD=<puntoone-database-password>
+POSTGRES_NETWORK=postgres_backend
+FRONTEND_ORIGIN=http://177.7.32.196:1994
+
+# Second checkout: use these values in its .env
+STORE_NAME=puntotwo
+HOST_PORT=1995
+POSTGRES_DB=puntotwo
+POSTGRES_USER=puntotwo
+POSTGRES_PASSWORD=<puntotwo-database-password>
+FRONTEND_ORIGIN=http://177.7.32.196:1995
+```
+
+Create each database and dedicated login on PostgreSQL before starting the
+corresponding app. Then run `./install.sh` (or `.\install.ps1` on Windows) in
+each checkout. The apps will be available at
+`http://177.7.32.196:1994/` and `http://177.7.32.196:1995/`, respectively.
+Allow both ports through the VPS firewall. If using a bundled local database
+instead of the shared PostgreSQL server, also choose a different
+`POSTGRES_LOCAL_PORT` for each instance. If using HTTPS or Cloudflare profiles,
+configure their ports/tunnels separately as well.
 
 ## Where to run it
 

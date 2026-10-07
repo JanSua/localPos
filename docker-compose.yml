@@ -1,9 +1,9 @@
-name: nodedr-pos
+name: "${STORE_NAME:-nodedr-pos}"
 
 services:
   db:
     image: postgres:17-alpine
-    container_name: nodedr-pos-db
+    container_name: localpos-${STORE_NAME:-nodedr-pos}-db
     hostname: postgres
     restart: unless-stopped
     profiles:
@@ -27,7 +27,7 @@ services:
       retries: 12
 
     networks:
-      postgres_backend:
+      nodedr-pos:
         aliases:
           - postgres
 
@@ -36,8 +36,8 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     image: localpos-backend:latest
-    container_name: nodedr-pos-backend
-    hostname: nodedr-pos-backend
+    container_name: localpos-${STORE_NAME:-nodedr-pos}-back
+    hostname: localpos-${STORE_NAME:-nodedr-pos}-back
     restart: unless-stopped
 
     environment:
@@ -47,7 +47,7 @@ services:
       POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       PORT: "4000"
-      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:1994}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:${HOST_PORT:-1994}}"
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
 
     expose:
@@ -72,12 +72,12 @@ services:
       args:
         BACKEND_URL: http://backend:4000
     image: localpos-frontend:latest
-    container_name: nodedr-pos-frontend
-    hostname: nodedr-pos-frontend
+    container_name: localpos-${STORE_NAME:-nodedr-pos}-front
+    hostname: localpos-${STORE_NAME:-nodedr-pos}-front
     restart: unless-stopped
 
     ports:
-      - "1994:3000"
+      - "${HOST_PORT:-1994}:3000"
 
     depends_on:
       - backend
@@ -87,7 +87,7 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: nodedr-pos-caddy
+    container_name: localpos-${STORE_NAME:-nodedr-pos}-caddy
     restart: unless-stopped
 
     profiles:
@@ -108,7 +108,7 @@ services:
 
   cloudflared-quick:
     image: cloudflare/cloudflared:latest
-    container_name: nodedr-pos-cloudflared-quick
+    container_name: localpos-${STORE_NAME:-nodedr-pos}-cloudflared-quick
     restart: unless-stopped
 
     profiles:
@@ -127,7 +127,7 @@ services:
 
   cloudflared:
     image: cloudflare/cloudflared:latest
-    container_name: nodedr-pos-cloudflared
+    container_name: localpos-${STORE_NAME:-nodedr-pos}-cloudflared
     restart: unless-stopped
 
     profiles:

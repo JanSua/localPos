@@ -50,6 +50,21 @@ if (-not $postgresMode) { $postgresMode = "local" }
 $postgresNetwork = Get-EnvValue "POSTGRES_NETWORK"
 if (-not $postgresNetwork) { $postgresNetwork = "nodedr-pos-postgres" }
 $postgresPassword = Get-EnvValue "POSTGRES_PASSWORD"
+$storeName = Get-EnvValue "STORE_NAME"
+if (-not $storeName) { $storeName = "nodedr-pos" }
+$hostPort = Get-EnvValue "HOST_PORT"
+if (-not $hostPort) { $hostPort = "1994" }
+
+if ($storeName -notmatch '^[a-z0-9][a-z0-9-]*$') {
+  Write-Error "Error: STORE_NAME must use lowercase letters, numbers, and hyphens, and start with a letter or number."
+  exit 1
+}
+
+$parsedHostPort = 0
+if (-not [int]::TryParse($hostPort, [ref]$parsedHostPort) -or $parsedHostPort -lt 1 -or $parsedHostPort -gt 65535) {
+  Write-Error "Error: HOST_PORT must be a number between 1 and 65535."
+  exit 1
+}
 
 if ($postgresMode -notin @("local", "external")) {
   Write-Error "Error: POSTGRES_MODE must be either 'local' or 'external'."
@@ -105,8 +120,9 @@ if ($postgresMode -eq "local") {
   }
 
   $dbReady = $false
+  $dbContainer = "localpos-$storeName-db"
   for ($i = 1; $i -le 90; $i++) {
-    $dbStatus = docker inspect --format "{{.State.Health.Status}}" nodedr-pos-db 2>$null
+    $dbStatus = docker inspect --format "{{.State.Health.Status}}" $dbContainer 2>$null
     if ($dbStatus -eq "healthy") {
       $dbReady = $true
       break
@@ -123,7 +139,7 @@ if ($postgresMode -eq "local") {
 # --- 3. Build the images and start the app ----------------------------------
 # External mode connects to the configured database without starting a
 # database container. Local mode has already waited for its bundled DB.
-Write-Output "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
+Write-Output "Building localpos-$storeName images and starting the stack (this can take a few minutes on first run)..."
 docker compose up -d --build backend frontend
 
 if ($LASTEXITCODE -ne 0) {
@@ -138,13 +154,7 @@ if ($LASTEXITCODE -ne 0) {
 # /api proxy on the same port the browser uses. Reads HOST_PORT from .env if
 # present (see .env.example), so this works whether or not the default port
 # was customized.
-$env:HOST_PORT = (Get-Content .env -ErrorAction SilentlyContinue |
-  Select-String -Pattern '^HOST_PORT=' |
-  ForEach-Object { $_.Line.Split('=')[1].Trim() })
-
-if (-not $env:HOST_PORT) {
-  $env:HOST_PORT = "1994"
-}
+$env:HOST_PORT = $hostPort
 
 Write-Output "Waiting for the app to come online..."
 
@@ -179,5 +189,5 @@ if (-not $ready) {
 
 # --- 5. Done ------------------------------------------------------------------
 Write-Output ""
-Write-Output "nodedr-pos is up and running."
+Write-Output "localpos-$storeName is up and running."
 Write-Output "Open http://localhost:$env:HOST_PORT in your browser to create your admin account and finish shop setup."

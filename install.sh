@@ -39,6 +39,20 @@ POSTGRES_MODE="${POSTGRES_MODE:-local}"
 POSTGRES_NETWORK="$(env_value POSTGRES_NETWORK)"
 POSTGRES_NETWORK="${POSTGRES_NETWORK:-nodedr-pos-postgres}"
 POSTGRES_PASSWORD="$(env_value POSTGRES_PASSWORD)"
+STORE_NAME="$(env_value STORE_NAME)"
+STORE_NAME="${STORE_NAME:-nodedr-pos}"
+HOST_PORT="$(env_value HOST_PORT)"
+HOST_PORT="${HOST_PORT:-1994}"
+
+if [[ ! "$STORE_NAME" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+  echo "Error: STORE_NAME must use lowercase letters, numbers, and hyphens, and start with a letter or number." >&2
+  exit 1
+fi
+
+if [[ ! "$HOST_PORT" =~ ^[0-9]+$ ]] || (( HOST_PORT < 1 || HOST_PORT > 65535 )); then
+  echo "Error: HOST_PORT must be a number between 1 and 65535." >&2
+  exit 1
+fi
 
 if [ "$POSTGRES_MODE" != "local" ] && [ "$POSTGRES_MODE" != "external" ]; then
   echo "Error: POSTGRES_MODE must be either 'local' or 'external'." >&2
@@ -70,9 +84,10 @@ fi
 if [ "$POSTGRES_MODE" = "local" ]; then
   echo "Starting the local PostgreSQL container..."
   docker compose --profile local-db up -d db
+  DB_CONTAINER="localpos-${STORE_NAME}-db"
   db_ready=false
   for _ in $(seq 1 90); do
-    db_status="$(docker inspect --format '{{.State.Health.Status}}' nodedr-pos-db 2>/dev/null || true)"
+    db_status="$(docker inspect --format '{{.State.Health.Status}}' "$DB_CONTAINER" 2>/dev/null || true)"
     if [ "$db_status" = "healthy" ]; then
       db_ready=true
       break
@@ -91,7 +106,7 @@ fi
 # --- 2. Build the images and start the app ----------------------------------
 # Local PostgreSQL and the session secret persist separately; external mode
 # connects to the configured database without starting a database container.
-echo "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
+echo "Building localpos-${STORE_NAME} images and starting the stack (this can take a few minutes on first run)..."
 docker compose up -d --build backend frontend
 
 # --- 3. Wait for the app to report healthy -----------------------------------
@@ -99,9 +114,6 @@ docker compose up -d --build backend frontend
 # /api proxy on the same port the browser uses. Reads HOST_PORT from .env if
 # present (see .env.example), so this works whether or not the default port
 # was customized — nothing about this script assumes localhost-only.
-HOST_PORT="$(grep -m1 '^HOST_PORT=' .env 2>/dev/null | cut -d= -f2-)"
-HOST_PORT="${HOST_PORT:-1994}"
-
 echo "Waiting for the app to come online..."
 ready=false
 for _ in $(seq 1 90); do
@@ -120,5 +132,5 @@ fi
 
 # --- 4. Done ------------------------------------------------------------------
 echo ""
-echo "nodedr-pos is up and running."
+echo "localpos-${STORE_NAME} is up and running."
 echo "Open http://localhost:${HOST_PORT} in your browser to create your admin account and finish shop setup."
