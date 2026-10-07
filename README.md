@@ -200,9 +200,11 @@ to the host at all. This means:
 - the API isn't exposed on the network, shrinking the attack surface.
 
 The frontend, backend, and PostgreSQL run as separate containers.
-PostgreSQL is bound on the host only at `127.0.0.1:15432` for local
-administration/tunnels; the backend connects over the private Compose
-network. It is not reachable from the LAN or public internet.
+In local mode PostgreSQL is bound on the host only at
+`127.0.0.1:${POSTGRES_LOCAL_PORT}` for administration; the backend connects
+over the private Docker network. In external mode no PostgreSQL port is
+published by this project. It is not reachable from the LAN or public
+internet through this Compose stack.
 
 ## Tech stack
 
@@ -250,21 +252,24 @@ cd nodedr-pos
 # 2. Copy .env.example to .env and set POSTGRES_PASSWORD to a strong
 #    alphanumeric/hex value (the one-click installers generate it for you).
 cp .env.example .env
-sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 32)/" .env
 
-# 3. Build the backend and frontend images (multi-stage, node:24-alpine).
+# 3. (Local database mode only) Create the shared network and wait for
+#    PostgreSQL. The one-click installers do this automatically.
+docker network create nodedr-pos-postgres
+docker compose --profile local-db up -d --wait db
+
+# 4. Build the backend and frontend images (multi-stage, node:24-alpine).
 #    First run takes a few minutes; later runs are cached and fast.
 docker compose build
 
-# 4. Start the services. The backend waits for PostgreSQL to become healthy
-#    and applies pending Prisma migrations before serving requests.
-docker compose up -d
+# 5. Start the app. The backend applies pending migrations before serving.
+docker compose up -d backend frontend
 
-# 5. (optional) Watch the logs until you see "listening on port 4000"
+# 6. (optional) Watch the logs until you see "listening on port 4000"
 #    and the Next.js server ready message.
 docker compose logs -f
 
-# 6. (later) Stop the stack without deleting your data:
+# 7. (later) Stop the stack without deleting your data:
 docker compose down
 ```
 
@@ -284,6 +289,41 @@ Want the web UI on a different port, or to deploy somewhere other than
 `localhost`? Copy `.env.example` to `.env` and set values there —
 `docker compose` reads it automatically. **`docker-compose.yml` itself never
 needs editing**, on a shop LAN box or a VPS alike.
+
+### Use an existing PostgreSQL server
+
+The default `POSTGRES_MODE=local` starts the bundled database container.
+To use a PostgreSQL server already running in Docker, set these in the root
+`.env` instead:
+
+```dotenv
+POSTGRES_MODE=external
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=nodedrpos
+POSTGRES_USER=nodedrpos
+POSTGRES_PASSWORD=<the-dedicated-user-password>
+POSTGRES_NETWORK=postgres_backend
+```
+
+The host and port are as seen **from containers on the shared Docker
+network**, not from the VPS host. For the setup where the database container
+is named `postgres` and both existing apps use `postgres_backend`, the values
+above are the right network endpoint. The installer joins that network but
+does not start the bundled database or publish a PostgreSQL port.
+
+Create a separate database and login for the POS using an existing
+PostgreSQL administrator account; do not reuse another app's credentials:
+
+```sql
+CREATE USER nodedrpos WITH PASSWORD 'use-a-long-random-alphanumeric-password';
+CREATE DATABASE nodedrpos OWNER nodedrpos;
+```
+
+Put the same password in `.env`; alphanumeric passwords are simplest to
+manage in environment files. Keep `POSTGRES_MODE=local` and the defaults on Windows development, or use
+`POSTGRES_MODE=external` there too if you already have PostgreSQL on a
+network the Windows Docker Engine can access.
 
 ## Where to run it
 
@@ -791,13 +831,16 @@ Linux/VPS or Task Scheduler on Windows, and copy backups to storage outside
 the VPS. Backups can be restored with `pg_restore` into a running PostgreSQL
 service; test restores periodically.
 
-To restore on Linux, stop the backend first, then restore the chosen dump
-and start the stack again:
+To restore, stop the backend first, then restore the chosen dump through a
+temporary PostgreSQL client attached to the configured database network:
 
 ```bash
 docker compose stop backend
-docker compose exec -T db pg_restore --exit-on-error --clean --if-exists --no-owner \
-  -U nodedr -d nodedrpos < backups/nodedr-pos-YYYYMMDD-HHMMSS.dump
+set -a; . ./.env; set +a
+docker run --rm -i --network "$POSTGRES_NETWORK" -e PGPASSWORD \
+  postgres:18-alpine pg_restore --exit-on-error --clean --if-exists --no-owner \
+  -h "$POSTGRES_HOST" -p "$POSTGRES_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  < backups/nodedr-pos-YYYYMMDD-HHMMSS.dump
 docker compose up -d
 ```
 

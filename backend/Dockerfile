@@ -18,7 +18,7 @@ RUN npm install --omit=dev && npm cache clean --force
 FROM node:24-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /app
-ENV DATABASE_URL=postgresql://nodedr:build-only@localhost:5432/nodedrpos?schema=public
+ENV POSTGRES_HOST=localhost POSTGRES_PORT=5432 POSTGRES_DB=nodedrpos POSTGRES_USER=nodedr POSTGRES_PASSWORD=build-only
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json prisma.config.js ./
 COPY prisma ./prisma

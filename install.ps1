@@ -38,9 +38,25 @@ if (-not (Test-Path $envPath)) {
   Copy-Item ".env.example" $envPath
 }
 
+function Get-EnvValue([string]$Name) {
+  $line = Get-Content $envPath | Where-Object { $_ -match "^$([regex]::Escape($Name))=" } | Select-Object -Last 1
+  if ($null -eq $line) { return "" }
+  return (($line -split '=', 2)[1].Trim().Trim('"').Trim("'"))
+}
+
 $envContents = [System.IO.File]::ReadAllText($envPath)
-$passwordMatch = [regex]::Match($envContents, '(?m)^POSTGRES_PASSWORD=(.*)$')
-if (-not $passwordMatch.Success -or [string]::IsNullOrWhiteSpace($passwordMatch.Groups[1].Value)) {
+$postgresMode = Get-EnvValue "POSTGRES_MODE"
+if (-not $postgresMode) { $postgresMode = "local" }
+$postgresNetwork = Get-EnvValue "POSTGRES_NETWORK"
+if (-not $postgresNetwork) { $postgresNetwork = "nodedr-pos-postgres" }
+$postgresPassword = Get-EnvValue "POSTGRES_PASSWORD"
+
+if ($postgresMode -notin @("local", "external")) {
+  Write-Error "Error: POSTGRES_MODE must be either 'local' or 'external'."
+  exit 1
+}
+
+if (-not $postgresPassword -and $postgresMode -eq "local") {
   $randomBytes = New-Object byte[] 32
   $randomGenerator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
   try {
@@ -51,6 +67,7 @@ if (-not $passwordMatch.Success -or [string]::IsNullOrWhiteSpace($passwordMatch.
   }
 
   $postgresPassword = [BitConverter]::ToString($randomBytes).Replace("-", "").ToLowerInvariant()
+  $passwordMatch = [regex]::Match($envContents, '(?m)^POSTGRES_PASSWORD=.*$')
   if ($passwordMatch.Success) {
     $envContents = [regex]::Replace(
       $envContents,
@@ -63,11 +80,51 @@ if (-not $passwordMatch.Success -or [string]::IsNullOrWhiteSpace($passwordMatch.
   }
   [System.IO.File]::WriteAllText($envPath, $envContents, [System.Text.UTF8Encoding]::new($false))
 }
+elseif (-not $postgresPassword) {
+  Write-Error "Error: set POSTGRES_PASSWORD in .env when POSTGRES_MODE=external."
+  exit 1
+}
 
-# --- 3. Build the images and start the stack --------------------------------
-# PostgreSQL and the session secret use separate persistent Docker volumes.
+# Ensure the selected external network exists. On a VPS, this normally finds
+# the existing network shared with the PostgreSQL service.
+docker network inspect $postgresNetwork *> $null
+if ($LASTEXITCODE -ne 0) {
+  docker network create $postgresNetwork | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Error: could not create Docker network '$postgresNetwork'."
+    exit 1
+  }
+}
+
+if ($postgresMode -eq "local") {
+  Write-Output "Starting the local PostgreSQL container..."
+  docker compose --profile local-db up -d db
+  if ($LASTEXITCODE -ne 0) {
+    Write-Error "Error: could not start local PostgreSQL. Check: docker compose logs db"
+    exit 1
+  }
+
+  $dbReady = $false
+  for ($i = 1; $i -le 90; $i++) {
+    $dbStatus = docker inspect --format "{{.State.Health.Status}}" nodedr-pos-db 2>$null
+    if ($dbStatus -eq "healthy") {
+      $dbReady = $true
+      break
+    }
+    if ($dbStatus -eq "unhealthy") { break }
+    Start-Sleep -Seconds 1
+  }
+  if (-not $dbReady) {
+    Write-Error "Error: PostgreSQL did not become healthy. Check: docker compose logs db"
+    exit 1
+  }
+}
+
+# --- 3. Build the images and start the app ----------------------------------
+# External mode connects to the configured database without starting a
+# database container. Local mode has already waited for its bundled DB.
 Write-Output "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
-docker compose up -d --build
+docker compose up -d --build backend frontend
 
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Error: Docker Compose failed to start the stack."

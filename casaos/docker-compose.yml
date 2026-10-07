@@ -7,8 +7,8 @@ services:
     hostname: db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: nodedrpos
-      POSTGRES_USER: nodedr
+      POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
+      POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}"
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
@@ -39,7 +39,11 @@ services:
     hostname: nodedr-pos-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}@db:5432/nodedrpos?schema=public"
+      POSTGRES_HOST: "${POSTGRES_HOST:-db}"
+      POSTGRES_PORT: "${POSTGRES_PORT:-5432}"
+      POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
+      POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}"
       PORT: "4000"
       FRONTEND_ORIGIN: "http://localhost:1994"
       COOKIE_SECURE: "false"

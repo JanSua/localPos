@@ -4,16 +4,18 @@ services:
   db:
     image: postgres:17-alpine
     container_name: nodedr-pos-db
-    hostname: db
+    hostname: postgres
     restart: unless-stopped
+    profiles:
+      - local-db
 
     environment:
-      POSTGRES_DB: nodedrpos
-      POSTGRES_USER: nodedr
+      POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
+      POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
 
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+      - "127.0.0.1:${POSTGRES_LOCAL_PORT:-15432}:5432"
 
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -25,7 +27,9 @@ services:
       retries: 12
 
     networks:
-      - nodedr-pos
+      postgres_backend:
+        aliases:
+          - postgres
 
   backend:
     build:
@@ -37,7 +41,11 @@ services:
     restart: unless-stopped
 
     environment:
-      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/nodedrpos?schema=public"
+      POSTGRES_HOST: "${POSTGRES_HOST:-postgres}"
+      POSTGRES_PORT: "${POSTGRES_PORT:-5432}"
+      POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
+      POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
       PORT: "4000"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:1994}"
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
@@ -55,10 +63,7 @@ services:
 
     networks:
       - nodedr-pos
-
-    depends_on:
-      db:
-        condition: service_healthy
+      - postgres_backend
 
   frontend:
     build:
@@ -144,6 +149,9 @@ services:
 networks:
   nodedr-pos:
     driver: bridge
+  postgres_backend:
+    name: "${POSTGRES_NETWORK:-nodedr-pos-postgres}"
+    external: true
 
 
 volumes:

@@ -84,7 +84,7 @@ docker compose up -d db
 # Terminal 1 — backend on :4000
 cd backend
 cp .env.example .env
-# Set DATABASE_URL using POSTGRES_PASSWORD from the root .env.
+# Set POSTGRES_* values using the root .env (host port 15432 locally).
 npm install
 npm run prisma:migrate:dev
 npm run dev

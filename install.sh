@@ -30,7 +30,22 @@ if [ ! -f .env ]; then
   cp .env.example .env
 fi
 
-if ! grep -q '^POSTGRES_PASSWORD=.' .env; then
+env_value() {
+  sed -n "s/^$1=//p" .env | tail -n 1 | tr -d '\r' | sed -e 's/^"//' -e 's/"$//'
+}
+
+POSTGRES_MODE="$(env_value POSTGRES_MODE)"
+POSTGRES_MODE="${POSTGRES_MODE:-local}"
+POSTGRES_NETWORK="$(env_value POSTGRES_NETWORK)"
+POSTGRES_NETWORK="${POSTGRES_NETWORK:-nodedr-pos-postgres}"
+POSTGRES_PASSWORD="$(env_value POSTGRES_PASSWORD)"
+
+if [ "$POSTGRES_MODE" != "local" ] && [ "$POSTGRES_MODE" != "external" ]; then
+  echo "Error: POSTGRES_MODE must be either 'local' or 'external'." >&2
+  exit 1
+fi
+
+if [ -z "$POSTGRES_PASSWORD" ] && [ "$POSTGRES_MODE" = "local" ]; then
   if ! command -v openssl >/dev/null 2>&1; then
     echo "Error: openssl is required to generate a PostgreSQL password." >&2
     exit 1
@@ -41,13 +56,43 @@ if ! grep -q '^POSTGRES_PASSWORD=.' .env; then
   else
     printf '\nPOSTGRES_PASSWORD=%s\n' "$postgres_password" >> .env
   fi
+elif [ -z "$POSTGRES_PASSWORD" ]; then
+  echo "Error: set POSTGRES_PASSWORD in .env when POSTGRES_MODE=external." >&2
+  exit 1
 fi
 
-# --- 2. Build the images and start the stack --------------------------------
-# PostgreSQL and the session secret use separate persistent Docker volumes.
-# The installer intentionally preserves the generated password across runs.
+# The network is external so this app can join a PostgreSQL network shared
+# with other Compose projects. Create it on standalone/local installs.
+if ! docker network inspect "$POSTGRES_NETWORK" >/dev/null 2>&1; then
+  docker network create "$POSTGRES_NETWORK" >/dev/null
+fi
+
+if [ "$POSTGRES_MODE" = "local" ]; then
+  echo "Starting the local PostgreSQL container..."
+  docker compose --profile local-db up -d db
+  db_ready=false
+  for _ in $(seq 1 90); do
+    db_status="$(docker inspect --format '{{.State.Health.Status}}' nodedr-pos-db 2>/dev/null || true)"
+    if [ "$db_status" = "healthy" ]; then
+      db_ready=true
+      break
+    fi
+    if [ "$db_status" = "unhealthy" ]; then
+      break
+    fi
+    sleep 1
+  done
+  if [ "$db_ready" != "true" ]; then
+    echo "Error: PostgreSQL did not become healthy. Check: docker compose logs db" >&2
+    exit 1
+  fi
+fi
+
+# --- 2. Build the images and start the app ----------------------------------
+# Local PostgreSQL and the session secret persist separately; external mode
+# connects to the configured database without starting a database container.
 echo "Building nodedr-pos images and starting the stack (this can take a few minutes on first run)..."
-docker compose up -d --build
+docker compose up -d --build backend frontend
 
 # --- 3. Wait for the app to report healthy -----------------------------------
 # The backend isn't published to the host; we probe it through the frontend's

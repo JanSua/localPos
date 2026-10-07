@@ -48,8 +48,8 @@ plain [`docker-compose.yml`](../docker-compose.yml) at the repo root — see
 know which container's port to open when you click the app.
 
 Set a strong alphanumeric PostgreSQL password in the install form. For
-administration from outside the host, use an SSH tunnel to localhost port
-15432; never publish the PostgreSQL port to the public interface.
+administration from outside the host, use an SSH tunnel to localhost;
+never publish the PostgreSQL port to the public interface.
 
 The backend's `/dev/bus/usb` bind mount and `device_cgroup_rules` are for
 **optional** direct-USB thermal receipt printing (see
