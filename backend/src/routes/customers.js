@@ -1,7 +1,7 @@
 const express = require('express');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin, requirePasswordConfirm } = require('../middleware/auth');
 const { round2 } = require('../lib/pricing');
 
 const router = express.Router();
@@ -65,17 +65,17 @@ router.get('/top-due', async (req, res) => {
 // GET /api/customers/phone/:phone — POS lookup for loyalty
 router.get('/phone/:phone', async (req, res) => {
   const customer = await prisma.customer.findUnique({ where: { phone: req.params.phone } });
-  if (!customer) return res.status(404).json({ error: 'Customer not found' });
+  if (!customer) return res.status(404).json({ error: 'No se encontró el cliente.' });
   res.json(customer);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const parsed = customerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del cliente no son válidos.', details: parsed.error.flatten() });
   }
   const existing = await prisma.customer.findUnique({ where: { phone: parsed.data.phone } });
-  if (existing) return res.status(409).json({ error: 'A customer with that phone already exists', customer: existing });
+  if (existing) return res.status(409).json({ error: 'Ya existe un cliente con ese teléfono.', customer: existing });
 
   const customer = await prisma.customer.create({ data: parsed.data });
   res.status(201).json(customer);
@@ -91,24 +91,24 @@ const settleDueSchema = z.object({
 // (CustomerDuePayment) rather than just decrementing a number with no
 // history. Amount is capped at the current balance — can't "overpay" a due
 // into a negative number by mistake.
-router.post('/:id/settle-due', async (req, res) => {
+router.post('/:id/settle-due', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid customer id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del cliente no es válido.' });
   const parsed = settleDueSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del pago no son válidos.', details: parsed.error.flatten() });
   }
 
   try {
     const customer = await prisma.$transaction(async (tx) => {
       const existing = await tx.customer.findUnique({ where: { id } });
-      if (!existing) throw Object.assign(new Error('Customer not found'), { status: 404 });
+      if (!existing) throw Object.assign(new Error('No se encontró el cliente.'), { status: 404 });
 
       const amount = Math.min(parsed.data.amount, existing.totalDue);
-      if (amount <= 0) throw Object.assign(new Error('This customer has no outstanding due'), { status: 400 });
+      if (amount <= 0) throw Object.assign(new Error('Este cliente no tiene una deuda pendiente.'), { status: 400 });
 
       await tx.customerDuePayment.create({
-        data: { customerId: id, amount, note: parsed.data.note || null },
+        data: { customerId: id, customerName: existing.name, amount, note: parsed.data.note || null },
       });
       // Compute + round in JS rather than a DB-side float `decrement`, so a
       // fully-settled due lands on exactly 0 and can never leave sub-paise
@@ -120,14 +120,14 @@ router.post('/:id/settle-due', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error(err);
-    res.status(status).json({ error: err.message || 'Could not record payment' });
+    res.status(status).json({ error: err.message || 'No se pudo registrar el pago.' });
   }
 });
 
 // GET /api/customers/:id/due-payments — settlement history for a customer
 router.get('/:id/due-payments', async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid customer id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del cliente no es válido.' });
   const payments = await prisma.customerDuePayment.findMany({
     where: { customerId: id },
     orderBy: { createdAt: 'desc' },
@@ -135,18 +135,54 @@ router.get('/:id/due-payments', async (req, res) => {
   res.json(payments);
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid customer id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del cliente no es válido.' });
   const parsed = customerSchema.partial().safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del cliente no son válidos.', details: parsed.error.flatten() });
   }
   try {
     const customer = await prisma.customer.update({ where: { id }, data: parsed.data });
     res.json(customer);
-  } catch {
-    res.status(404).json({ error: 'Customer not found' });
+  } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'Ya existe un cliente con ese teléfono.' });
+    }
+    if (err.code === 'P2025') return res.status(404).json({ error: 'No se encontró el cliente.' });
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo actualizar el cliente.' });
+  }
+});
+
+router.delete('/:id', requireAdmin, requirePasswordConfirm, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del cliente no es válido.' });
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({ where: { id } });
+      if (!customer) throw Object.assign(new Error('No se encontró el cliente.'), { status: 404 });
+      if (customer.totalDue > 0 || customer.creditBalance > 0) {
+        throw Object.assign(
+          new Error('No se puede eliminar un cliente con saldo pendiente de deuda o crédito.'),
+          { status: 409 },
+        );
+      }
+
+      await tx.invoice.updateMany({ where: { customerId: id }, data: { customerId: null } });
+      await tx.return.updateMany({ where: { customerId: id }, data: { customerId: null } });
+      await tx.customerDuePayment.updateMany({
+        where: { customerId: id },
+        data: { customerId: null, customerName: customer.name },
+      });
+      await tx.customer.delete({ where: { id } });
+    });
+    res.status(204).end();
+  } catch (err) {
+    const status = err.status || 500;
+    if (status === 500) console.error(err);
+    res.status(status).json({ error: err.message || 'No se pudo eliminar el cliente.' });
   }
 });
 

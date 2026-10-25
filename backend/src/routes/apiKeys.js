@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
 router.post('/', requirePasswordConfirm, async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos de la clave API no son válidos.', details: parsed.error.flatten() });
   }
   const { name, canWrite, webhookUrl } = parsed.data;
   const { plaintext, keyPrefix, keyHash } = generateApiKey();
@@ -79,11 +79,11 @@ const updateSchema = z.object({
 // side — there is no "unrevoke"; issue a new key instead, same as a GitHub PAT.
 router.put('/:id', requirePasswordConfirm, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador no es válido.' });
 
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos de la clave API no son válidos.', details: parsed.error.flatten() });
   }
   const data = { ...parsed.data };
   // Changing the webhook URL invalidates the old signature relationship —
@@ -99,19 +99,19 @@ router.put('/:id', requirePasswordConfirm, async (req, res) => {
     if (data.webhookSecret) body.webhookSecret = data.webhookSecret; // shown once, same as creation
     res.json(body);
   } catch {
-    res.status(404).json({ error: 'API key not found' });
+    res.status(404).json({ error: 'No se encontró la clave API.' });
   }
 });
 
 // DELETE /api/api-keys/:id — hard delete.
 router.delete('/:id', requirePasswordConfirm, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador no es válido.' });
   try {
     await prisma.apiKey.delete({ where: { id } });
     res.status(204).end();
   } catch {
-    res.status(404).json({ error: 'API key not found' });
+    res.status(404).json({ error: 'No se encontró la clave API.' });
   }
 });
 

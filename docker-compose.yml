@@ -6,6 +6,7 @@ services:
     container_name: localpos-${STORE_NAME:-nodedr-pos}-db
     hostname: postgres
     restart: unless-stopped
+    command: ["postgres", "-c", "timezone=America/Bogota"]
     profiles:
       - local-db
 
@@ -13,6 +14,7 @@ services:
       POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
       POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      TZ: "America/Bogota"
 
     ports:
       - "127.0.0.1:${POSTGRES_LOCAL_PORT:-15432}:5432"
@@ -46,6 +48,7 @@ services:
       POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
       POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+      TZ: "America/Bogota"
       PORT: "4000"
       FRONTEND_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:${HOST_PORT:-1994}}"
       COOKIE_SECURE: "${COOKIE_SECURE:-false}"
@@ -70,6 +73,8 @@ services:
     container_name: localpos-${STORE_NAME:-nodedr-pos}-front
     hostname: localpos-${STORE_NAME:-nodedr-pos}-front
     restart: unless-stopped
+    environment:
+      TZ: "America/Bogota"
 
     ports:
       - "${HOST_BIND_ADDRESS:-0.0.0.0}:${HOST_PORT:-1994}:3000"

@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
+  ChevronDown,
+  ChevronUp,
   Barcode as BarcodeIcon,
   PackagePlus,
   Pencil,
@@ -28,12 +30,23 @@ type ModalState =
   | { mode: "add"; initialBarcode?: string }
   | { mode: "edit"; product: Product }
   | null;
+type SortKey =
+  | "name"
+  | "barcode"
+  | "category"
+  | "taxRate"
+  | "purchasePrice"
+  | "sellingPrice"
+  | "stock";
+type SortDirection = "asc" | "desc";
 
 export default function InventoryPage() {
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState<ModalState>(null);
   const [stockTarget, setStockTarget] = useState<Product | null>(null);
   const [labelTarget, setLabelTarget] = useState<Product | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { data: shop } = useShopSettings();
   const { data: products, isLoading } = useProducts(search);
   const deleteProduct = useDeleteProduct();
@@ -42,6 +55,56 @@ export default function InventoryPage() {
   const sym = shop?.currencySymbol || "Rs.";
   const money = (n: number) => formatMoney(n, sym);
   const lowStockThreshold = shop?.lowStockAlert ?? 5;
+  const sortedProducts = useMemo(() => {
+    if (!products) return [];
+    return [...products].sort((a, b) => {
+      const comparison =
+        sortKey === "name" || sortKey === "barcode" || sortKey === "category"
+          ? (a[sortKey] ?? "").localeCompare(b[sortKey] ?? "", "es", {
+              sensitivity: "base",
+              numeric: sortKey === "barcode",
+            })
+          : a[sortKey] - b[sortKey];
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [products, sortDirection, sortKey]);
+
+  function changeSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDirection((direction) => (direction === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("asc");
+  }
+
+  function sortHeader(label: string, key: SortKey, alignRight = false) {
+    const active = sortKey === key;
+    const SortIcon = sortDirection === "asc" ? ChevronUp : ChevronDown;
+    return (
+      <th
+        className={`py-2 pr-4 ${alignRight ? "text-right" : ""}`}
+        aria-sort={
+          active
+            ? sortDirection === "asc"
+              ? "ascending"
+              : "descending"
+            : "none"
+        }
+      >
+        <button
+          type="button"
+          onClick={() => changeSort(key)}
+          className={`inline-flex items-center gap-1 hover:text-foreground ${
+            alignRight ? "justify-end" : ""
+          } ${active ? "text-foreground" : ""}`}
+        >
+          {label}
+          {active && <SortIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+        </button>
+      </th>
+    );
+  }
 
   const handleScan = useCallback(
     async (code: string) => {
@@ -128,20 +191,20 @@ export default function InventoryPage() {
             <table className="w-full min-w-max text-left text-sm">
               <thead>
                 <tr className="text-xs uppercase text-foreground/50">
-                  <th className="py-2 pr-4">Producto</th>
-                  <th className="py-2 pr-4">Código de barras</th>
-                  <th className="py-2 pr-4">Categoría</th>
+                  {sortHeader("Producto", "name")}
+                  {sortHeader("Código de barras", "barcode")}
+                  {sortHeader("Categoría", "category")}
                   {shop?.gstEnabled && (
-                    <th className="py-2 pr-4 text-right">GST</th>
+                    sortHeader("GST", "taxRate", true)
                   )}
-                  <th className="py-2 pr-4 text-right">Costo</th>
-                  <th className="py-2 pr-4 text-right">Precio</th>
-                  <th className="py-2 pr-4 text-right">Stock</th>
+                  {sortHeader("Costo", "purchasePrice", true)}
+                  {sortHeader("Precio", "sellingPrice", true)}
+                  {sortHeader("Stock", "stock", true)}
                   <th className="py-2" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {products.map((product) => {
+                {sortedProducts.map((product) => {
                   const low = product.stock <= lowStockThreshold;
                   return (
                     <tr key={product.id}>
@@ -205,16 +268,16 @@ export default function InventoryPage() {
                         </button>
                       </td>
                       <td className="py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-3">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             aria-label={`Etiqueta de código de barras para ${product.name}`}
                             title="Etiqueta de código de barras / QR"
                             onClick={() => setLabelTarget(product)}
-                            className="text-foreground/40 hover:text-brand"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-muted text-foreground/70 transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand"
                           >
                             <BarcodeIcon
-                              className="h-4 w-4"
+                              className="h-5 w-5"
                               aria-hidden="true"
                             />
                           </button>
@@ -223,10 +286,10 @@ export default function InventoryPage() {
                             aria-label={`Ajustar stock para ${product.name}`}
                             title="Ajustar stock"
                             onClick={() => setStockTarget(product)}
-                            className="text-foreground/40 hover:text-brand"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-muted text-foreground/70 transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand"
                           >
                             <PackagePlus
-                              className="h-4 w-4"
+                              className="h-5 w-5"
                               aria-hidden="true"
                             />
                           </button>
@@ -235,18 +298,18 @@ export default function InventoryPage() {
                             aria-label={`Editar ${product.name}`}
                             title="Editar producto"
                             onClick={() => setModal({ mode: "edit", product })}
-                            className="text-foreground/40 hover:text-brand"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-muted text-foreground/70 transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand"
                           >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                            <Pencil className="h-5 w-5" aria-hidden="true" />
                           </button>
                           <button
                             type="button"
                             aria-label={`Eliminar ${product.name}`}
                             title="Eliminar producto"
                             onClick={() => handleDelete(product)}
-                            className="text-foreground/40 hover:text-danger"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-muted text-foreground/70 transition-colors hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
                           >
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            <Trash2 className="h-5 w-5" aria-hidden="true" />
                           </button>
                         </div>
                       </td>

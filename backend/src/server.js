@@ -71,7 +71,7 @@ app.use('/api/masters', mastersRoutes);
 app.use('/api/api-keys', apiKeyRoutes);
 app.use('/api/external', externalRoutes);
 
-app.use((req, res) => res.status(404).json({ error: 'Not found' }));
+app.use((req, res) => res.status(404).json({ error: 'No se encontró la ruta solicitada.' }));
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {

@@ -14,9 +14,6 @@ import {
   LogOut,
   Menu,
   X,
-  Search,
-  ChevronDown,
-  CalendarRange,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { api } from "@/lib/api";
@@ -47,7 +44,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [now, setNow] = useState<Date | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setNow(new Date());
+    const interval = window.setInterval(() => setNow(new Date()), 1_000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   async function handleLogout() {
     await api.post("/auth/logout");
@@ -81,33 +85,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     (item) => !item.adminOnly || me?.role === "admin",
   );
   const sym = shop?.currencySymbol || "Rs.";
+  const dateParts = now
+    ? new Intl.DateTimeFormat("es-CO", {
+        timeZone: "America/Bogota",
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+      }).formatToParts(now)
+    : [];
+  const day = dateParts.find((part) => part.type === "day")?.value;
+  const month = dateParts.find((part) => part.type === "month")?.value;
+  const year = dateParts.find((part) => part.type === "year")?.value;
+  const date = day && month && year
+    ? `${day} - ${month.charAt(0).toLocaleUpperCase("es-CO")}${month.slice(1)} - ${year}`
+    : "";
+  const time = now
+    ? new Intl.DateTimeFormat("es-CO", {
+        timeZone: "America/Bogota",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hourCycle: "h23",
+      }).format(now)
+    : "";
 
   return (
     <div className="flex min-h-screen flex-1 flex-col lg:flex-row">
       {/* Mobile header */}
       <header className="flex items-center justify-between border-b border-border-subtle bg-surface px-4 py-3 lg:hidden">
-        <div className="flex items-center gap-2">
-          <Image
-            src="/logo.png"
-            alt=""
-            width={28}
-            height={28}
-            className="h-7 w-7 shrink-0 rounded-full"
-            aria-hidden="true"
-          />
-          <span className="truncate font-semibold text-foreground">
-            {shop?.shopName || "nodedr-pos"}
-          </span>
-        </div>
+        <time
+          dateTime={now?.toISOString()}
+          title="Hora de Colombia (UTC−5)"
+          className="text-xs font-medium capitalize text-foreground-muted"
+        >
+          {date} | {time}
+        </time>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label="Buscar"
-            onClick={() => setSearchOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted hover:bg-surface-muted"
-          >
-            <Search className="h-5 w-5" aria-hidden="true" />
-          </button>
           <ThemeToggle />
           <button
             type="button"
@@ -205,43 +218,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Utility top bar (desktop) */}
-        <header className="hidden items-center gap-4 border-b border-border-subtle bg-surface/80 px-6 py-3 backdrop-blur-md lg:flex">
-          <Link
-            href={me?.role === "admin" ? "/settings" : "#"}
-            className={clsx(
-              "flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-foreground transition-colors",
-              me?.role === "admin" && "hover:bg-surface-muted",
-            )}
-          >
-            <span className="truncate">{shop?.shopName || "nodedr-pos"}</span>
-            {me?.role === "admin" && (
-              <ChevronDown
-                className="h-3.5 w-3.5 text-foreground-muted"
-                aria-hidden="true"
-              />
-            )}
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            className="flex flex-1 max-w-md items-center gap-2 rounded-lg border border-border-subtle bg-surface-muted/60 px-3 py-2 text-sm text-foreground-muted transition-colors hover:border-border hover:text-foreground"
-          >
-            <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="flex-1 text-left">
-              Buscar productos, ir a una página…
-            </span>
-            <kbd className="rounded-md border border-border-subtle bg-surface px-1.5 py-0.5 text-[10px] font-medium">
-              ⌘K
-            </kbd>
-          </button>
-
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-medium text-foreground-muted xl:flex">
-              <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
-              Últimos 14 días
-            </span>
-
+        <header className="hidden items-center justify-end gap-2 border-b border-border-subtle bg-surface px-6 py-3 lg:flex">
+            <time
+              dateTime={now?.toISOString()}
+              title="Hora de Colombia (UTC−5)"
+              className="mr-2 text-sm font-medium capitalize text-foreground-muted"
+            >
+              {date} | {time}
+            </time>
             <ThemeToggle />
 
             <div className="relative" ref={userMenuRef}>
@@ -255,7 +239,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {me?.name?.trim()?.[0]?.toUpperCase() || "?"}
               </button>
               {userMenuOpen && (
-                <div className="glass-panel absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-xl bg-surface-elevated shadow-2xl">
+                <div className="absolute right-0 top-11 z-10 w-48 overflow-hidden rounded-xl border border-border-subtle bg-surface-elevated shadow-2xl">
                   <div className="border-b border-border-subtle px-3.5 py-3">
                     <p className="truncate text-sm font-medium text-foreground">
                       {me?.name}
@@ -264,19 +248,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {me?.role === "admin" ? "Administrador" : "Cajero"}
                     </p>
                   </div>
-                  {me?.role === "admin" && (
-                    <Link
-                      href="/settings"
-                      onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-foreground transition-colors hover:bg-surface-muted"
-                    >
-                      <Settings
-                        className="h-4 w-4 text-foreground-muted"
-                        aria-hidden="true"
-                      />
-                      Configuración
-                    </Link>
-                  )}
                   <button
                     type="button"
                     onClick={handleLogout}
@@ -291,7 +262,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
             </div>
-          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">

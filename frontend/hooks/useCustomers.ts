@@ -51,6 +51,24 @@ export function useCreateCustomer() {
   });
 }
 
+export function useUpdateCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: CustomerInput }) =>
+      api.put<Customer>(`/customers/${id}`, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
+export function useDeleteCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, confirmPassword }: { id: number; confirmPassword: string }) =>
+      api.delete<void>(`/customers/${id}`, { confirmPassword }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+  });
+}
+
 export function useSettleDue() {
   const queryClient = useQueryClient();
   return useMutation({

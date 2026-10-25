@@ -1,0 +1,10 @@
+ALTER TABLE "Invoice"
+ADD COLUMN "status" TEXT NOT NULL DEFAULT 'COMPLETED',
+ADD COLUMN "voidedAt" TIMESTAMP(3),
+ADD COLUMN "voidReason" TEXT;
+
+ALTER TABLE "CustomerDuePayment"
+ALTER COLUMN "customerId" DROP NOT NULL;
+
+ALTER TABLE "CustomerDuePayment"
+ADD COLUMN "customerName" TEXT;

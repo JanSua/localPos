@@ -15,7 +15,7 @@ export interface ReturnDraftLine {
   invoiceId: number;
   invoiceNumber: string;
   invoiceItemId: number;
-  productId: number;
+  productId: number | null;
   name: string;
   quantity: number;
   maxQuantity: number;
@@ -23,7 +23,7 @@ export interface ReturnDraftLine {
   refundAmount: number;
 }
 
-type Row = { invoiceItemId: number; productId: number; name: string; returnable: number; unitPaid: number; qty: number; refund: string };
+type Row = { invoiceItemId: number; productId: number | null; name: string; returnable: number; unitPaid: number; qty: number; refund: string };
 
 interface Props {
   sym: string;

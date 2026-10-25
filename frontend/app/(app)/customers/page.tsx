@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Check, Plus, Search, Star, X } from "lucide-react";
+import { Check, Pencil, Plus, Search, Star, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
@@ -13,8 +13,12 @@ import { useToast } from "@/components/Toast";
 import {
   useCustomers,
   useCreateCustomer,
+  useDeleteCustomer,
   useSettleDue,
+  useUpdateCustomer,
 } from "@/hooks/useCustomers";
+import { useMe } from "@/hooks/useAuth";
+import { usePasswordConfirm } from "@/components/PasswordConfirm";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { formatMoney } from "@/lib/format";
 import { ApiError } from "@/lib/api";
@@ -30,12 +34,18 @@ type Form = z.infer<typeof schema>;
 export default function CustomersPage() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [settleTarget, setSettleTarget] = useState<Customer | null>(null);
   const { data: customers, isLoading } = useCustomers(search);
+  const { data: user } = useMe();
   const { data: shop } = useShopSettings();
   const createCustomer = useCreateCustomer();
+  const updateCustomer = useUpdateCustomer();
+  const deleteCustomer = useDeleteCustomer();
   const settleDue = useSettleDue();
   const { show } = useToast();
+  const { withPasswordConfirm } = usePasswordConfirm();
+  const isAdmin = user?.role === "admin";
   const sym = shop?.currencySymbol || "Rs.";
 
   async function clearDue(c: Customer) {
@@ -63,15 +73,52 @@ export default function CustomersPage() {
     formState: { errors, isSubmitting },
   } = useForm<Form>({ resolver: zodResolver(schema) });
 
-  async function onCreate(values: Form) {
+  function openCreateForm() {
+    setEditingCustomer(null);
+    reset({ name: "", phone: "", email: "" });
+    setShowForm(true);
+  }
+
+  function openEditForm(customer: Customer) {
+    setEditingCustomer(customer);
+    reset({ name: customer.name, phone: customer.phone, email: customer.email ?? "" });
+    setShowForm(true);
+  }
+
+  async function onSave(values: Form) {
     try {
-      await createCustomer.mutateAsync(values);
-      show("Cliente agregado", "success");
+      if (editingCustomer) {
+        await updateCustomer.mutateAsync({ id: editingCustomer.id, data: values });
+        show("Cliente actualizado", "success");
+      } else {
+        await createCustomer.mutateAsync(values);
+        show("Cliente agregado", "success");
+      }
       reset();
       setShowForm(false);
+      setEditingCustomer(null);
     } catch (err) {
       show(
-        err instanceof ApiError ? err.message : "No se pudo agregar el cliente",
+        err instanceof ApiError ? err.message : "No se pudo guardar el cliente",
+        "error",
+      );
+    }
+  }
+
+  async function removeCustomer(customer: Customer) {
+    if (!window.confirm(`¿Eliminar a ${customer.name}? Las facturas y devoluciones históricas se conservarán.`)) return;
+    try {
+      const result = await withPasswordConfirm(
+        `eliminar al cliente ${customer.name}`,
+        async (confirmPassword) => {
+          await deleteCustomer.mutateAsync({ id: customer.id, confirmPassword });
+          return true;
+        },
+      );
+      if (result) show("Cliente eliminado", "success");
+    } catch (err) {
+      show(
+        err instanceof ApiError ? err.message : "No se pudo eliminar el cliente",
         "error",
       );
     }
@@ -88,16 +135,18 @@ export default function CustomersPage() {
               : "Tu directorio de clientes."}
           </p>
         </div>
-        <Button onClick={() => setShowForm((s) => !s)}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Añadir cliente
-        </Button>
+        {isAdmin && !showForm && (
+          <Button onClick={openCreateForm}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Añadir cliente
+          </Button>
+        )}
       </div>
 
       {showForm && (
         <Card className="p-6">
           <form
-            onSubmit={handleSubmit(onCreate)}
+            onSubmit={handleSubmit(onSave)}
             noValidate
             className="grid grid-cols-1 gap-4 sm:grid-cols-3"
           >
@@ -117,12 +166,16 @@ export default function CustomersPage() {
             />
             <div className="flex items-end gap-2 sm:col-span-3">
               <Button type="submit" disabled={isSubmitting}>
-                Guardar cliente
+                {editingCustomer ? "Guardar cambios" : "Guardar cliente"}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditingCustomer(null);
+                  reset();
+                }}
               >
                 <X className="h-4 w-4" aria-hidden="true" /> Cancelar
               </Button>
@@ -168,6 +221,7 @@ export default function CustomersPage() {
                   {shop?.loyaltyEnabled && (
                     <th className="py-2 text-right">Puntos</th>
                   )}
+                  {isAdmin && <th className="py-2 text-right">Acciones</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -188,23 +242,30 @@ export default function CustomersPage() {
                     <td className="py-2.5 pr-4 text-right">
                       {c.totalDue >= 0.01 ? (
                         <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setSettleTarget(c)}
-                            className="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger hover:bg-danger/20"
-                            title="Registrar un pago"
-                          >
+                          <span className="rounded-full bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger">
                             {formatMoney(c.totalDue, sym)}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => clearDue(c)}
-                            aria-label={`Saldar deuda de ${c.name}`}
-                            title="Saldar deuda (marcar como totalmente pagada)"
-                            className="text-foreground/40 hover:text-success"
-                          >
-                            <Check className="h-4 w-4" aria-hidden="true" />
-                          </button>
+                          </span>
+                          {isAdmin && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setSettleTarget(c)}
+                                className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-foreground/70 hover:bg-surface-muted"
+                                title="Registrar un pago"
+                              >
+                                Registrar pago
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => clearDue(c)}
+                                aria-label={`Saldar deuda de ${c.name}`}
+                                title="Saldar deuda (marcar como totalmente pagada)"
+                                className="text-foreground/40 hover:text-success"
+                              >
+                                <Check className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       ) : (
                         <span className="text-foreground/30">—</span>
@@ -225,6 +286,32 @@ export default function CustomersPage() {
                           <Star className="h-3 w-3" aria-hidden="true" />
                           {c.loyaltyPoints}
                         </span>
+                      </td>
+                    )}
+                    {isAdmin && (
+                      <td className="py-2.5 text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="px-2.5 py-1.5"
+                            aria-label={`Editar ${c.name}`}
+                            title="Editar cliente"
+                            onClick={() => openEditForm(c)}
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            className="px-2.5 py-1.5"
+                            aria-label={`Eliminar ${c.name}`}
+                            title="Eliminar cliente"
+                            onClick={() => removeCustomer(c)}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        </div>
                       </td>
                     )}
                   </tr>

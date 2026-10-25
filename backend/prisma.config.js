@@ -11,6 +11,7 @@ connectionUrl.username = process.env.POSTGRES_USER || 'nodedr';
 connectionUrl.password = process.env.POSTGRES_PASSWORD || '';
 connectionUrl.pathname = `/${process.env.POSTGRES_DB || 'nodedrpos'}`;
 connectionUrl.searchParams.set('schema', 'public');
+connectionUrl.searchParams.set('options', '-c timezone=America/Bogota');
 
 module.exports = defineConfig({
   schema: 'prisma/schema.prisma',

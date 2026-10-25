@@ -37,9 +37,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     });
   } catch (err) {
     if (err instanceof DOMException && err.name === "TimeoutError") {
-      throw new ApiError("Request timed out — check your connection and try again", 0);
+      throw new ApiError("La solicitud tardó demasiado. Revisa tu conexión e inténtalo de nuevo.", 0);
     }
-    throw new ApiError("Network error — check your connection and try again", 0);
+    throw new ApiError("Error de conexión. Revisa tu red e inténtalo de nuevo.", 0);
   }
 
   if (res.status === 204) return undefined as T;

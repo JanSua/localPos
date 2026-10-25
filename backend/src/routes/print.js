@@ -23,11 +23,11 @@ async function loadInvoiceAndShop(id) {
 // cashier's screen never navigates away.
 router.get('/:invoiceId/receipt', async (req, res) => {
   const id = Number(req.params.invoiceId);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid invoice id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador de la factura no es válido.' });
 
   const { invoice, shop } = await loadInvoiceAndShop(id);
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
-  if (!shop) return res.status(400).json({ error: 'Shop settings not configured' });
+  if (!invoice) return res.status(404).json({ error: 'No se encontró la factura.' });
+  if (!shop) return res.status(400).json({ error: 'La configuración de la tienda no está disponible.' });
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(buildReceiptHtml({ shop, invoice }));
@@ -36,11 +36,11 @@ router.get('/:invoiceId/receipt', async (req, res) => {
 // GET /api/print/:invoiceId/pdf — downloads the receipt as a PDF file.
 router.get('/:invoiceId/pdf', async (req, res) => {
   const id = Number(req.params.invoiceId);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid invoice id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador de la factura no es válido.' });
 
   const { invoice, shop } = await loadInvoiceAndShop(id);
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
-  if (!shop) return res.status(400).json({ error: 'Shop settings not configured' });
+  if (!invoice) return res.status(404).json({ error: 'No se encontró la factura.' });
+  if (!shop) return res.status(400).json({ error: 'La configuración de la tienda no está disponible.' });
 
   try {
     const pdf = await buildReceiptPdf({ shop, invoice });
@@ -49,7 +49,7 @@ router.get('/:invoiceId/pdf', async (req, res) => {
     res.send(pdf);
   } catch (err) {
     console.error('PDF generation failed:', err);
-    res.status(500).json({ error: 'Could not generate PDF' });
+    res.status(500).json({ error: 'No se pudo generar el PDF.' });
   }
 });
 

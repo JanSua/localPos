@@ -11,6 +11,7 @@ import { usePasswordConfirm } from "@/components/PasswordConfirm";
 import { useApiKeys, useCreateApiKey, useUpdateApiKey, useDeleteApiKey } from "@/hooks/useApiKeys";
 import { describeApiError } from "@/lib/api";
 import type { ApiKey, ApiKeyWithSecrets } from "@/lib/types";
+import { formatColombiaDateTime } from "@/lib/colombia-time";
 
 export function IntegrationsTab() {
   const { data: keys, isLoading } = useApiKeys();
@@ -130,7 +131,7 @@ function ApiKeyRow({
         <p className="mt-0.5 text-xs text-foreground/50">
           nk_live_{apiKey.keyPrefix}… · {apiKey.webhookUrl ? "Webhook configurado" : "Sin webhook"} ·{" "}
           {apiKey.lastUsedAt
-            ? `Último uso: ${new Date(apiKey.lastUsedAt).toLocaleString("es-CO")}`
+            ? `Último uso: ${formatColombiaDateTime(apiKey.lastUsedAt)}`
             : "Nunca utilizada"}
         </p>
       </div>

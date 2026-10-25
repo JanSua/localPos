@@ -6,10 +6,12 @@ services:
     container_name: nodedr-pos-db
     hostname: db
     restart: unless-stopped
+    command: ["postgres", "-c", "timezone=America/Bogota"]
     environment:
       POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
       POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}"
+      TZ: "America/Bogota"
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
     volumes:
@@ -44,6 +46,7 @@ services:
       POSTGRES_DB: "${POSTGRES_DB:-nodedrpos}"
       POSTGRES_USER: "${POSTGRES_USER:-nodedr}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set a strong PostgreSQL password}"
+      TZ: "America/Bogota"
       PORT: "4000"
       FRONTEND_ORIGIN: "http://localhost:1994"
       COOKIE_SECURE: "false"
@@ -74,6 +77,8 @@ services:
     container_name: nodedr-pos-frontend
     hostname: nodedr-pos-frontend
     restart: unless-stopped
+    environment:
+      TZ: "America/Bogota"
     ports:
       - target: 3000
         published: "1994"

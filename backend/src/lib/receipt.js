@@ -18,7 +18,7 @@ function buildReceiptHtml({ shop, invoice }) {
   const sym = shop.currencySymbol || 'Rs.';
   const money = (n) => `${sym} ${formatAmount(n)}`;
   const date = new Date(invoice.createdAt || Date.now());
-  const dateStr = date.toLocaleString('es-CO');
+  const dateStr = date.toLocaleString('es-CO', { timeZone: 'America/Bogota' });
   const customerName =
     !invoice.customerName || invoice.customerName === 'Walk-in Customer'
       ? 'Cliente ocasional'
@@ -147,6 +147,7 @@ function buildReceiptHtml({ shop, invoice }) {
   <div class="receipt">
     ${shop.receiptHeader ? `<p class="center muted">${esc(shop.receiptHeader).replace(/\n/g, '<br>')}</p>` : ''}
     <h1>${esc(shop.shopName)}</h1>
+    ${invoice.status === 'VOIDED' ? '<p class="center"><strong>VENTA ANULADA</strong></p>' : ''}
     ${shop.nit ? `<p class="center muted">NIT: ${esc(shop.nit)}</p>` : ''}
     <p class="center muted">
       ${esc(shop.address1)}${shop.address2 ? `, ${esc(shop.address2)}` : ''}<br>
@@ -158,6 +159,7 @@ function buildReceiptHtml({ shop, invoice }) {
     <p class="muted">
       ${esc(dateStr)}<br>
       Factura: #${esc(invoice.invoiceNumber)}<br>
+      ${invoice.status === 'VOIDED' && invoice.voidReason ? `Motivo de anulación: ${esc(invoice.voidReason)}<br>` : ''}
       Cliente: ${esc(customerName)}${invoice.customerPhone ? ` · ${esc(invoice.customerPhone)}` : ''}
     </p>
     <hr class="rule">

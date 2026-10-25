@@ -743,6 +743,13 @@ After `git pull`, running `./install.sh` rebuilds/recreates the services.
 The backend runs `prisma migrate deploy` at startup, which applies only
 pending migrations. Do not remove volumes when updating.
 
+The Colombia-time migration converts existing timestamps by interpreting
+their old timezone-less values as UTC, which is the default for the bundled
+PostgreSQL setup. Before updating an installation that uses an external
+database or a non-default PostgreSQL timezone, make a backup and confirm its
+historical timestamps were stored as UTC; otherwise the conversion may shift
+their displayed time.
+
 ## Backing up your data
 
 Create a consistent custom-format PostgreSQL backup while the service is

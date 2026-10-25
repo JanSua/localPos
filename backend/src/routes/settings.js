@@ -90,11 +90,11 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
   const existing = await prisma.shopSettings.findFirst();
   if (existing) {
-    return res.status(403).json({ error: 'Shop settings already configured; use PUT /api/settings' });
+    return res.status(403).json({ error: 'La tienda ya está configurada; actualiza los datos existentes.' });
   }
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos de configuración no son válidos.', details: parsed.error.flatten() });
   }
   const created = await prisma.shopSettings.create({ data: withSymbol(parsed.data) });
   res.status(201).json(created);
@@ -103,11 +103,11 @@ router.post('/', async (req, res) => {
 // PUT /api/settings — admins edit company/currency/tax/loyalty/receipt config
 router.put('/', requireAuth, requireAdmin, requirePasswordConfirm, async (req, res) => {
   const existing = await prisma.shopSettings.findFirst();
-  if (!existing) return res.status(404).json({ error: 'No shop settings to update' });
+  if (!existing) return res.status(404).json({ error: 'No hay una configuración de tienda para actualizar.' });
 
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos de configuración no son válidos.', details: parsed.error.flatten() });
   }
   const data = { ...parsed.data };
   if (data.currencyCode) data.currencySymbol = symbolFor(data.currencyCode);

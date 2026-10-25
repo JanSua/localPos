@@ -40,19 +40,19 @@ function clearSessionCookie(res) {
 // immediately rather than staying valid until the token expires.
 async function requireAuth(req, res, next) {
   const token = req.cookies?.[TOKEN_COOKIE];
-  if (!token) return res.status(401).json({ error: 'Not authenticated' });
+  if (!token) return res.status(401).json({ error: 'Debes iniciar sesión para continuar.' });
 
   let payload;
   try {
     payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
   } catch {
-    return res.status(401).json({ error: 'Invalid or expired session' });
+    return res.status(401).json({ error: 'La sesión no es válida o ha expirado.' });
   }
 
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || !user.active) {
     clearSessionCookie(res);
-    return res.status(401).json({ error: 'Account not found or disabled' });
+    return res.status(401).json({ error: 'La cuenta no existe o está desactivada.' });
   }
 
   req.user = { id: user.id, name: user.name, email: user.email, role: user.role };
@@ -75,7 +75,7 @@ function readSession(req) {
 
 function requireAdmin(req, res, next) {
   if (req.user?.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
+    return res.status(403).json({ error: 'Esta acción requiere permisos de administrador.' });
   }
   next();
 }
@@ -140,7 +140,7 @@ async function verifyPassword(userId, password) {
 async function requirePasswordConfirm(req, res, next) {
   const ok = await verifyPassword(req.user.id, req.body?.confirmPassword);
   if (!ok) {
-    return res.status(401).json({ error: 'Confirm your password to continue', code: 'PASSWORD_CONFIRM_REQUIRED' });
+    return res.status(401).json({ error: 'Confirma tu contraseña para continuar.', code: 'PASSWORD_CONFIRM_REQUIRED' });
   }
   next();
 }

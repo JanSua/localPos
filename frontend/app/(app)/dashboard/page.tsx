@@ -5,11 +5,9 @@ import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
-  Award,
   Download,
   Package,
   Receipt,
-  Star,
   TrendingUp,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -22,11 +20,9 @@ import {
   useSalesAnalytics,
   useSalesSummary,
 } from "@/hooks/useInvoices";
-import {
-  useTopLoyaltyCustomers,
-} from "@/hooks/useCustomers";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { formatMoney } from "@/lib/format";
+import { formatColombiaDateTime } from "@/lib/colombia-time";
 
 export default function DashboardPage() {
   const { data: shop } = useShopSettings();
@@ -35,11 +31,12 @@ export default function DashboardPage() {
   const { data: summary } = useSalesSummary();
   const { data: invoices } = useInvoices();
   const { data: analytics } = useSalesAnalytics();
-  const { data: topCustomers } = useTopLoyaltyCustomers(10);
+  const recentInvoices = (invoices ?? [])
+    .filter((invoice) => invoice.status === "COMPLETED")
+    .slice(0, 8);
 
   const sym = shop?.currencySymbol || "Rs.";
   const money = (n: number) => formatMoney(n, sym);
-  const bestSeller = analytics?.topProducts[0];
 
   // trend is ordered oldest → newest over the last 14 days, so the final
   // two entries are today and yesterday — enough to show a "vs yesterday"
@@ -99,28 +96,9 @@ export default function DashboardPage() {
         />
       </div>
 
-      {bestSeller && bestSeller.quantity > 0 && (
-        <Card className="flex items-center gap-4 border-brand/30 bg-brand/5 p-5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
-            <Award className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div>
-            <p className="text-xs font-medium text-foreground/50">
-              Mejor vendedor (últimos 14 días)
-            </p>
-            <p className="text-base font-semibold text-foreground">
-              {bestSeller.name}{" "}
-              <span className="font-normal text-foreground/60">
-                · {bestSeller.quantity} vendido · {money(bestSeller.revenue)}
-              </span>
-            </p>
-          </div>
-        </Card>
-      )}
-
       <SalesCharts sym={sym} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div>
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground">
@@ -130,7 +108,7 @@ export default function DashboardPage() {
               href="/inventory"
               className="text-sm font-medium text-brand hover:underline"
             >
-              Gestionar Invetario
+              Gestionar Inventario
             </Link>
           </div>
           {!lowStock || lowStock.products.length === 0 ? (
@@ -162,52 +140,6 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">
-              Mejores clientes
-            </h2>
-            <Link
-              href="/customers"
-              className="text-sm font-medium text-brand hover:underline"
-            >
-              Ver todo
-            </Link>
-          </div>
-          {!topCustomers || topCustomers.length === 0 ? (
-            <p className="py-6 text-center text-sm text-foreground/50">
-              Sin puntos de lealtad aún.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {topCustomers.map((customer, i) => (
-                <li
-                  key={customer.id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-muted text-xs font-semibold text-foreground/60">
-                      {i + 1}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {customer.name}
-                      </p>
-                      <p className="text-xs text-foreground/50">
-                        {customer.phone}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="flex items-center gap-1 rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
-                    <Star className="h-3 w-3" aria-hidden="true" />
-                    {customer.loyaltyPoints}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-
       </div>
 
       <Card className="p-5">
@@ -222,7 +154,7 @@ export default function DashboardPage() {
             Ver todo
           </Link>
         </div>
-        {!invoices || invoices.length === 0 ? (
+        {recentInvoices.length === 0 ? (
           <p className="py-6 text-center text-sm text-foreground/50">
             Aún no hay ventas registradas.
           </p>
@@ -238,16 +170,16 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {invoices.slice(0, 8).map((inv) => (
+                {recentInvoices.map((inv) => (
                   <tr key={inv.id}>
                     <td className="py-2.5 pr-4 font-medium text-foreground">
                       {inv.invoiceNumber}
                     </td>
                     <td className="py-2.5 pr-4 text-foreground/70">
-                      {inv.customerName}
+                      {displayCustomerName(inv.customerName)}
                     </td>
                     <td className="py-2.5 pr-4 text-foreground/70">
-                      {new Date(inv.createdAt).toLocaleString()}
+                      {formatColombiaDateTime(inv.createdAt)}
                     </td>
                     <td className="py-2.5 text-right font-medium text-foreground">
                       {money(inv.totalAmount)}
@@ -261,6 +193,10 @@ export default function DashboardPage() {
       </Card>
     </div>
   );
+}
+
+function displayCustomerName(name: string) {
+  return !name || name === "Walk-in Customer" ? "Cliente ocasional" : name;
 }
 
 function StatCard({

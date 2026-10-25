@@ -13,7 +13,7 @@ model User {
   password  String
   role      String   @default("admin") // "admin" | "cashier"
   active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 }
 
 model ShopSettings {
@@ -72,8 +72,8 @@ model Product {
   discountType  String?       // "percent" | "amount" | null (no standing discount)
   discountValue Float         @default(0) // interpreted per discountType; applied automatically at checkout
   stock         Int           @default(0)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
   invoiceItems  InvoiceItem[]
   returnItems   ReturnItem[]
 }
@@ -88,7 +88,7 @@ model Customer {
   totalDue      Float     @default(0) // outstanding credit ("udhaar") owed by this customer
   creditBalance Float     @default(0) // store credit owed TO the customer (e.g. from a return kept as balance)
   visits        Int       @default(0)
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
   invoices      Invoice[]
   duePayments   CustomerDuePayment[]
   returns       Return[]
@@ -99,11 +99,12 @@ model Customer {
 // Customer.totalDue with no history.
 model CustomerDuePayment {
   id         Int      @id @default(autoincrement())
-  customerId Int
+  customerId Int?
+  customerName String?
   amount     Float
   note       String?
-  createdAt  DateTime @default(now())
-  customer   Customer @relation(fields: [customerId], references: [id])
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  customer   Customer? @relation(fields: [customerId], references: [id])
 }
 
 model Invoice {
@@ -130,7 +131,10 @@ model Invoice {
   refundMode     String? // "CASH" | "CREDIT" — how refundValue was settled
   pointsRedeemed Int           @default(0)
   pointsEarned   Int           @default(0)
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  status         String        @default("COMPLETED") // COMPLETED | VOIDED
+  voidedAt       DateTime?     @db.Timestamptz(3)
+  voidReason     String?
   customer       Customer?     @relation(fields: [customerId], references: [id])
   items          InvoiceItem[]
   returns        Return[]
@@ -139,7 +143,7 @@ model Invoice {
 model InvoiceItem {
   id        Int     @id @default(autoincrement())
   invoiceId Int
-  productId Int
+  productId Int?
   name      String
   unit      String? // snapshot of the product's UQC at time of sale
   quantity  Int
@@ -148,7 +152,7 @@ model InvoiceItem {
   taxAmount Float   @default(0) // tax for this line (on discounted base)
   total     Float // line total incl. tax, after prorated discount
   invoice   Invoice @relation(fields: [invoiceId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   returnItems ReturnItem[]
 }
 
@@ -165,7 +169,7 @@ model Return {
   totalRefund  Float
   refundMethod String // "CASH" | "UPI" | "CARD" | "DUE_ADJUST"
   note         String?
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
   invoice      Invoice      @relation(fields: [invoiceId], references: [id])
   customer     Customer?    @relation(fields: [customerId], references: [id])
   items        ReturnItem[]
@@ -175,13 +179,13 @@ model ReturnItem {
   id            Int         @id @default(autoincrement())
   returnId      Int
   invoiceItemId Int
-  productId     Int
+  productId     Int?
   name          String
   quantity      Int
   refundAmount  Float
   return        Return      @relation(fields: [returnId], references: [id])
   invoiceItem   InvoiceItem @relation(fields: [invoiceItemId], references: [id])
-  product       Product     @relation(fields: [productId], references: [id])
+  product       Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
 // --- Bulk reference data, admin-imported from CSV (see routes/masters.js) ---
@@ -209,9 +213,9 @@ model ApiKey {
   canWrite      Boolean   @default(false)
   webhookUrl    String?
   webhookSecret String?
-  lastUsedAt    DateTime?
+  lastUsedAt    DateTime? @db.Timestamptz(3)
   revoked       Boolean   @default(false)
-  createdAt     DateTime  @default(now())
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
 }
 
 model TaxCode {

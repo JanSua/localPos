@@ -1,11 +1,12 @@
 const express = require('express');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
-const { requireAuth, verifyPassword } = require('../middleware/auth');
+const { requireAuth, requireAdmin, verifyPassword } = require('../middleware/auth');
 const { computeSale, round2 } = require('../lib/pricing');
 const { notifyStockChange } = require('../lib/webhooks');
 
 const router = express.Router();
+const { addDays, bogotaDayStart, dateKeyInBogota, parseBogotaDate } = require('../lib/colombia-time');
 router.use(requireAuth);
 
 const checkoutSchema = z
@@ -59,7 +60,7 @@ const checkoutSchema = z
 
 async function nextInvoiceNumber(tx) {
   const count = await tx.invoice.count();
-  const year = new Date().getFullYear();
+  const year = dateKeyInBogota().slice(0, 4);
   return `INV-${year}-${String(count + 1).padStart(5, '0')}`;
 }
 
@@ -70,7 +71,7 @@ async function nextInvoiceNumber(tx) {
 router.post('/', async (req, res) => {
   const parsed = checkoutSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos enviados no son válidos.', details: parsed.error.flatten() });
   }
   const body = parsed.data;
 
@@ -80,14 +81,14 @@ router.post('/', async (req, res) => {
   if (body.returns.length > 0) {
     const ok = await verifyPassword(req.user.id, req.body?.confirmPassword);
     if (!ok) {
-      return res.status(401).json({ error: 'Confirm your password to process this refund', code: 'PASSWORD_CONFIRM_REQUIRED' });
+      return res.status(401).json({ error: 'Confirma tu contraseña para procesar este reembolso.', code: 'PASSWORD_CONFIRM_REQUIRED' });
     }
   }
 
   try {
     const result = await prisma.$transaction(async (tx) => {
       const settings = await tx.shopSettings.findFirst();
-      if (!settings) throw Object.assign(new Error('Shop settings not configured'), { status: 400 });
+      if (!settings) throw Object.assign(new Error('La configuración de la tienda no está disponible.'), { status: 400 });
 
       const productIds = body.items.map((i) => i.productId);
       const products = await tx.product.findMany({ where: { id: { in: productIds } } });
@@ -96,10 +97,10 @@ router.post('/', async (req, res) => {
       const lines = [];
       for (const item of body.items) {
         const product = productMap.get(item.productId);
-        if (!product) throw Object.assign(new Error(`Product ${item.productId} not found`), { status: 404 });
+        if (!product) throw Object.assign(new Error(`No se encontró el producto ${item.productId}.`), { status: 404 });
         if (!settings.allowNegativeStock && product.stock < item.quantity) {
           throw Object.assign(
-            new Error(`Insufficient stock for "${product.name}" (have ${product.stock}, need ${item.quantity})`),
+            new Error(`Existencias insuficientes para "${product.name}" (disponibles: ${product.stock}; solicitadas: ${item.quantity}).`),
             { status: 409 }
           );
         }
@@ -142,26 +143,28 @@ router.post('/', async (req, res) => {
       const returnRecords = [];
       for (const grp of body.returns) {
         const original = await tx.invoice.findUnique({ where: { id: grp.invoiceId }, include: { items: true } });
-        if (!original) throw Object.assign(new Error(`Invoice ${grp.invoiceId} not found for return`), { status: 404 });
+        if (!original) throw Object.assign(new Error(`No se encontró la factura ${grp.invoiceId} para la devolución.`), { status: 404 });
         const itemMap = new Map(original.items.map((it) => [it.id, it]));
         const lines = [];
         let groupRefund = 0;
         for (const rl of grp.items) {
           const invItem = itemMap.get(rl.invoiceItemId);
-          if (!invItem) throw Object.assign(new Error('Return item not found on that invoice'), { status: 404 });
+          if (!invItem) throw Object.assign(new Error('No se encontró el artículo devuelto en esa factura.'), { status: 404 });
           const already = await tx.returnItem.aggregate({
             where: { invoiceItemId: invItem.id },
             _sum: { quantity: true },
           });
           const returnable = invItem.quantity - (already._sum.quantity || 0);
           if (rl.quantity > returnable) {
-            throw Object.assign(new Error(`Only ${returnable} of "${invItem.name}" can still be returned`), { status: 409 });
+            throw Object.assign(            new Error(`Solo se pueden devolver ${returnable} unidades de "${invItem.name}".`), { status: 409 });
           }
           const maxRefund = round2((invItem.total / invItem.quantity) * rl.quantity);
           const refund = rl.refundAmount != null ? round2(Math.min(Math.max(0, rl.refundAmount), maxRefund)) : maxRefund;
           groupRefund = round2(groupRefund + refund);
           returnValue = round2(returnValue + refund);
-          restock.set(invItem.productId, (restock.get(invItem.productId) || 0) + rl.quantity);
+          if (invItem.productId != null) {
+            restock.set(invItem.productId, (restock.get(invItem.productId) || 0) + rl.quantity);
+          }
           lines.push({
             invoiceItemId: invItem.id,
             productId: invItem.productId,
@@ -179,7 +182,7 @@ router.post('/', async (req, res) => {
       // "spending" more of it than the purchase is worth.
       let creditApplied = 0;
       if (body.creditApplied > 0) {
-        if (!customer) throw Object.assign(new Error('A customer is required to use store credit'), { status: 400 });
+        if (!customer) throw Object.assign(new Error('Se requiere un cliente para usar el saldo a favor.'), { status: 400 });
         creditApplied = round2(Math.min(body.creditApplied, customer.creditBalance, Math.max(0, saleTotal - returnValue)));
       }
 
@@ -192,7 +195,7 @@ router.post('/', async (req, res) => {
       if (grossRefund > 0) {
         refundMode = body.refundMode;
         if (refundMode === 'CREDIT' && !customer) {
-          throw Object.assign(new Error('A customer is required to keep a refund as store credit'), { status: 400 });
+          throw Object.assign(new Error('Se requiere un cliente para conservar el reembolso como saldo a favor.'), { status: 400 });
         }
       }
 
@@ -201,7 +204,7 @@ router.post('/', async (req, res) => {
       let duePaidIntent = 0;
       if (body.duePaid > 0) {
         if (!customer) {
-          throw Object.assign(new Error('A customer (with phone number) is required to clear a previous due'), { status: 400 });
+          throw Object.assign(new Error('Se requiere un cliente con teléfono para pagar un saldo pendiente anterior.'), { status: 400 });
         }
         duePaidIntent = round2(Math.min(body.duePaid, customer.totalDue));
       }
@@ -231,7 +234,7 @@ router.post('/', async (req, res) => {
       const dueAmount = round2(Math.max(0, payable - amountPaid));
       if (dueAmount > 0 && !customer) {
         throw Object.assign(
-          new Error('A customer (with phone number) is required to record a due/partial-payment amount'),
+          new Error('Se requiere un cliente con teléfono para registrar un pago parcial o un saldo pendiente.'),
           { status: 400 }
         );
       }
@@ -344,7 +347,140 @@ router.post('/', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error(err);
-    res.status(status).json({ error: err.message || 'Checkout failed' });
+    res.status(status).json({ error: err.message || 'No se pudo completar la venta.' });
+  }
+});
+
+const voidInvoiceSchema = z.object({
+  reason: z.string().trim().max(200).optional().default(''),
+});
+
+router.post('/:id/void', requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador de la venta no es válido.' });
+  const parsed = voidInvoiceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Datos de anulación no válidos.', details: parsed.error.flatten() });
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.invoice.updateMany({
+        where: { id, status: 'COMPLETED' },
+        data: { status: 'COMPLETED' },
+      });
+      if (claimed.count !== 1) {
+        const existing = await tx.invoice.findUnique({ where: { id }, select: { id: true } });
+        if (!existing) throw Object.assign(new Error('No se encontró la venta.'), { status: 404 });
+        throw Object.assign(new Error('Esta venta ya fue anulada.'), { status: 409 });
+      }
+
+      const invoice = await tx.invoice.findUnique({
+        where: { id },
+        include: { items: true, returns: { include: { items: true } } },
+      });
+      if (!invoice) throw Object.assign(new Error('No se encontró la venta.'), { status: 404 });
+      const blockingMovements = [];
+      if (invoice.returnValue > 0.01 || invoice.refundValue > 0.01) {
+        blockingMovements.push('una devolución o reembolso registrados en esta misma venta');
+      }
+      if (invoice.dueAmount > 0.01) blockingMovements.push('saldo pendiente');
+      if (invoice.previousDuePaid > 0.01) blockingMovements.push('pago de un saldo anterior');
+      if (invoice.creditApplied > 0.01) blockingMovements.push('uso de crédito');
+      if (blockingMovements.length > 0) {
+        throw Object.assign(
+          new Error(`No se puede anular esta venta porque registra ${blockingMovements.join(', ')}.`),
+          { status: 409 },
+        );
+      }
+
+      const returnedQuantities = new Map();
+      for (const record of invoice.returns) {
+        for (const item of record.items) {
+          returnedQuantities.set(
+            item.invoiceItemId,
+            (returnedQuantities.get(item.invoiceItemId) || 0) + item.quantity,
+          );
+        }
+      }
+      const hasReturns = invoice.returns.length > 0;
+      const isFullyReturned =
+        hasReturns &&
+        invoice.items.every(
+          (item) => (returnedQuantities.get(item.id) || 0) === item.quantity,
+        );
+      if (hasReturns && !isFullyReturned) {
+        throw Object.assign(
+          new Error('No se puede anular una venta con devoluciones parciales. Completa o resuelve primero esas devoluciones.'),
+          { status: 409 },
+        );
+      }
+
+      let customerUpdate = null;
+      if (invoice.customerId != null) {
+        const customer = await tx.customer.findUnique({ where: { id: invoice.customerId } });
+        if (customer) {
+          const totalSpent = round2(customer.totalSpent - invoice.totalAmount);
+          const loyaltyPoints = customer.loyaltyPoints - invoice.pointsEarned + invoice.pointsRedeemed;
+          if (totalSpent < 0 || loyaltyPoints < 0) {
+            throw Object.assign(
+              new Error('No se puede anular: el cliente ya usó el saldo generado por esta venta.'),
+              { status: 409 },
+            );
+          }
+          customerUpdate = {
+            id: customer.id,
+            totalSpent,
+            loyaltyPoints,
+            visits: Math.max(0, customer.visits - 1),
+          };
+        }
+      }
+
+      await tx.invoice.update({
+        where: { id },
+        data: {
+          status: 'VOIDED',
+          voidedAt: new Date(),
+          voidReason: parsed.data.reason || null,
+        },
+      });
+
+      for (const item of invoice.items) {
+        const quantityToRestock = item.quantity - (returnedQuantities.get(item.id) || 0);
+        if (quantityToRestock <= 0 || item.productId == null) continue;
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: quantityToRestock } },
+        });
+      }
+      if (customerUpdate) {
+        await tx.customer.update({
+          where: { id: customerUpdate.id },
+          data: {
+            totalSpent: customerUpdate.totalSpent,
+            loyaltyPoints: customerUpdate.loyaltyPoints,
+            visits: customerUpdate.visits,
+          },
+        });
+      }
+
+      return invoice.items
+        .filter((item) => item.productId != null && item.quantity > (returnedQuantities.get(item.id) || 0))
+        .map((item) => item.productId);
+    });
+
+    if (result.length > 0) {
+      prisma.product
+        .findMany({ where: { id: { in: [...new Set(result)] }, sku: { not: null } } })
+        .then((products) => notifyStockChange(products.map((product) => ({ sku: product.sku, stock: product.stock }))))
+        .catch((err) => console.error('post-void stock webhook lookup failed', err));
+    }
+    res.json({ message: 'Venta anulada y existencias repuestas.' });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status === 500) console.error(err);
+    res.status(status).json({ error: err.message || 'No se pudo anular la venta.' });
   }
 });
 
@@ -360,11 +496,11 @@ router.get('/', async (req, res) => {
 
 // GET /api/invoices/summary — dashboard totals for today
 router.get('/summary', async (req, res) => {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
+  const start = bogotaDayStart();
+  const end = addDays(start, 1);
   const [todays, all] = await Promise.all([
-    prisma.invoice.findMany({ where: { createdAt: { gte: start } } }),
-    prisma.invoice.aggregate({ _sum: { totalAmount: true }, _count: true }),
+    prisma.invoice.findMany({ where: { status: 'COMPLETED', createdAt: { gte: start, lt: end } } }),
+    prisma.invoice.aggregate({ where: { status: 'COMPLETED' }, _sum: { totalAmount: true }, _count: true }),
   ]);
   const todaysRevenue = round2(todays.reduce((s, i) => s + i.totalAmount, 0));
   res.json({
@@ -375,53 +511,79 @@ router.get('/summary', async (req, res) => {
   });
 });
 
-// Calendar-day key in the server's local timezone. Using toISOString().slice(0, 10)
-// here would convert to UTC first — in any timezone ahead of UTC (e.g. IST,
-// UTC+5:30) that silently shifts "today" back a day, so a bucket built from
-// local midnight and a bucket looked up from an invoice's own timestamp would
-// key to DIFFERENT dates and every invoice would land outside the whole
-// window (see git history for the bug this replaced: every invoice missed
-// every bucket, so the trend chart always showed "not enough sales").
-function localDateKey(d) {
-  const dt = new Date(d);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-}
-
-// GET /api/invoices/analytics — feeds the dashboard charts: revenue trend
-// over the last 14 days, top-selling products, and payment method mix.
+// GET /api/invoices/analytics — sales trend, top products, and payment mix
+// for a selected date range. Without dates, retains the previous 14-day view.
 router.get('/analytics', async (req, res) => {
-  const since = new Date();
-  since.setDate(since.getDate() - 13);
-  since.setHours(0, 0, 0, 0);
+  const hasFrom = req.query.from != null;
+  const hasTo = req.query.to != null;
+  if (hasFrom !== hasTo) {
+    return res.status(400).json({ error: 'Debes indicar las fechas inicial y final.' });
+  }
 
+  let start;
+  let end;
+  if (hasFrom) {
+    start = parseBogotaDate(req.query.from);
+    const lastDay = parseBogotaDate(req.query.to);
+    if (!start || !lastDay || start > lastDay) {
+      return res.status(400).json({ error: 'El rango de fechas no es válido.' });
+    }
+    end = addDays(lastDay, 1);
+  } else {
+    const today = bogotaDayStart();
+    start = addDays(today, -13);
+    end = addDays(today, 1);
+  }
+
+  const dateFilter = { gte: start, lt: end };
   const [recent, topItems, byMethod] = await Promise.all([
     prisma.invoice.findMany({
-      where: { createdAt: { gte: since } },
+      where: { status: 'COMPLETED', createdAt: dateFilter },
       select: { createdAt: true, totalAmount: true, paymentMethod: true },
     }),
     prisma.invoiceItem.groupBy({
       by: ['productId', 'name'],
+      where: { invoice: { is: { status: 'COMPLETED', createdAt: dateFilter } } },
       _sum: { quantity: true, total: true },
       orderBy: { _sum: { quantity: 'desc' } },
       take: 10,
     }),
     prisma.invoice.groupBy({
       by: ['paymentMethod'],
+      where: { status: 'COMPLETED', createdAt: dateFilter },
       _sum: { totalAmount: true },
       _count: true,
     }),
   ]);
 
+  const firstDay = new Date(start);
+  const lastDay = addDays(end, -1);
+  const firstKey = dateKeyInBogota(firstDay);
+  const lastKey = dateKeyInBogota(lastDay);
+  const [firstYear, firstMonth, firstDate] = firstKey.split('-').map(Number);
+  const [lastYear, lastMonth, lastDate] = lastKey.split('-').map(Number);
+  const dayCount =
+    Math.round(
+      (Date.UTC(lastYear, lastMonth - 1, lastDate) -
+        Date.UTC(firstYear, firstMonth - 1, firstDate)) /
+        86_400_000,
+    ) + 1;
+  const monthly = dayCount > 90;
   const trendMap = new Map();
-  for (let i = 0; i < 14; i++) {
-    const d = new Date(since);
-    d.setDate(d.getDate() + i);
-    const key = localDateKey(d);
-    trendMap.set(key, { date: key, revenue: 0, count: 0 });
+  const bucketDate = new Date(firstDay);
+  while (bucketDate <= lastDay) {
+    const key = dateKeyInBogota(bucketDate);
+    const bucketKey = monthly ? `${key.slice(0, 7)}-01` : key;
+    if (!trendMap.has(bucketKey)) {
+      trendMap.set(bucketKey, { date: bucketKey, revenue: 0, count: 0 });
+    }
+    if (monthly) bucketDate.setUTCMonth(bucketDate.getUTCMonth() + 1, 1);
+    else bucketDate.setUTCDate(bucketDate.getUTCDate() + 1);
   }
   for (const inv of recent) {
-    const key = localDateKey(inv.createdAt);
-    const bucket = trendMap.get(key);
+    const key = dateKeyInBogota(inv.createdAt);
+    const bucketKey = monthly ? `${key.slice(0, 7)}-01` : key;
+    const bucket = trendMap.get(bucketKey);
     if (bucket) {
       bucket.revenue = round2(bucket.revenue + inv.totalAmount);
       bucket.count += 1;
@@ -440,6 +602,7 @@ router.get('/analytics', async (req, res) => {
       count: m._count,
       revenue: round2(m._sum.totalAmount || 0),
     })),
+    granularity: monthly ? 'month' : 'day',
   });
 });
 
@@ -474,6 +637,7 @@ router.get('/export.csv', async (req, res) => {
     'Total',
     'Amount Paid',
     'Change Due',
+    'Status',
   ];
   const rows = invoices.map((inv) => [
     inv.invoiceNumber,
@@ -488,6 +652,7 @@ router.get('/export.csv', async (req, res) => {
     inv.totalAmount,
     inv.amountPaid,
     inv.changeDue,
+    inv.status,
   ]);
   const csv = [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
 
@@ -498,9 +663,9 @@ router.get('/export.csv', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid invoice id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador de la factura no es válido.' });
   const invoice = await prisma.invoice.findUnique({ where: { id }, include: { items: true } });
-  if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+  if (!invoice) return res.status(404).json({ error: 'No se encontró la factura.' });
   res.json(invoice);
 });
 

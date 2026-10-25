@@ -59,10 +59,10 @@ function normalizeDiscount(data) {
     return data;
   }
   if (data.discountType === 'percent' && data.discountValue > 100) {
-    throw Object.assign(new Error('Percent discount cannot exceed 100'), { status: 400 });
+    throw Object.assign(new Error('El descuento porcentual no puede superar el 100 %.'), { status: 400 });
   }
   if (data.discountType === 'amount' && data.sellingPrice != null && data.discountValue > data.sellingPrice) {
-    throw Object.assign(new Error('Flat discount cannot exceed the selling price'), { status: 400 });
+    throw Object.assign(new Error('El descuento fijo no puede superar el precio de venta.'), { status: 400 });
   }
   return data;
 }
@@ -93,20 +93,20 @@ router.get('/low-stock', async (req, res) => {
 // GET /api/products/barcode/:barcode — scanner lookup
 router.get('/barcode/:barcode', async (req, res) => {
   const product = await prisma.product.findUnique({ where: { barcode: req.params.barcode } });
-  if (!product) return res.status(404).json({ error: 'Product not found' });
+  if (!product) return res.status(404).json({ error: 'No se encontró el producto.' });
   res.json(product);
 });
 
 router.post('/', async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del producto no son válidos.', details: parsed.error.flatten() });
   }
   const existing = await prisma.product.findUnique({ where: { barcode: parsed.data.barcode } });
-  if (existing) return res.status(409).json({ error: 'Barcode already exists', product: existing });
+  if (existing) return res.status(409).json({ error: 'Ya existe un producto con ese código de barras.', product: existing });
   if (parsed.data.sku) {
     const existingSku = await prisma.product.findUnique({ where: { sku: parsed.data.sku } });
-    if (existingSku) return res.status(409).json({ error: 'SKU already linked to another product', product: existingSku });
+    if (existingSku) return res.status(409).json({ error: 'El SKU ya está vinculado a otro producto.', product: existingSku });
   }
 
   let data;
@@ -121,11 +121,11 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid product id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del producto no es válido.' });
 
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del producto no son válidos.', details: parsed.error.flatten() });
   }
   let data;
   try {
@@ -141,25 +141,24 @@ router.put('/:id', async (req, res) => {
     res.json(product);
   } catch (err) {
     if (err.code === 'P2002') {
-      return res.status(409).json({ error: 'SKU already linked to another product' });
+      return res.status(409).json({ error: 'El SKU ya está vinculado a otro producto.' });
     }
-    res.status(404).json({ error: 'Product not found' });
+    if (err.code === 'P2025') return res.status(404).json({ error: 'No se encontró el producto.' });
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo actualizar el producto.' });
   }
 });
 
 router.delete('/:id', async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid product id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del producto no es válido.' });
   try {
     await prisma.product.delete({ where: { id } });
     res.status(204).end();
   } catch (err) {
-    if (err.code === 'P2003') {
-      return res
-        .status(409)
-        .json({ error: 'This product appears on past invoices and cannot be deleted. Set its stock to 0 instead.' });
-    }
-    res.status(404).json({ error: 'Product not found' });
+    if (err.code === 'P2025') return res.status(404).json({ error: 'No se encontró el producto.' });
+    console.error(err);
+    res.status(500).json({ error: 'No se pudo eliminar el producto.' });
   }
 });
 

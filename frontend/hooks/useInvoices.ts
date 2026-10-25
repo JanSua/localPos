@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { Invoice } from "@/lib/types";
 
@@ -15,6 +15,7 @@ export interface SalesAnalytics {
   trend: { date: string; revenue: number; count: number }[];
   topProducts: { name: string; quantity: number; revenue: number }[];
   paymentMethods: { method: string; count: number; revenue: number }[];
+  granularity: "day" | "month";
 }
 
 export function useInvoices(search = "") {
@@ -40,10 +41,39 @@ export function useInvoice(id: number | null) {
   });
 }
 
-export function useSalesAnalytics() {
+export function useVoidInvoice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      reason,
+    }: {
+      id: number;
+      reason: string;
+    }) => api.post<{ message: string }>(`/invoices/${id}/void`, { reason }),
+    onSuccess: (_result, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["returns"] });
+    },
+  });
+}
+
+export function useSalesAnalytics(from?: string, to?: string) {
+  const query = new URLSearchParams();
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const search = query.toString();
+
   return useQuery({
-    queryKey: ["invoices", "analytics"],
-    queryFn: () => api.get<SalesAnalytics>("/invoices/analytics"),
+    queryKey: ["invoices", "analytics", from, to],
+    queryFn: () =>
+      api.get<SalesAnalytics>(
+        `/invoices/analytics${search ? `?${search}` : ""}`,
+      ),
     refetchInterval: 60_000,
+    enabled: Boolean(from) === Boolean(to),
   });
 }

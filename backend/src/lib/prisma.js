@@ -7,6 +7,7 @@ const adapter = new PrismaPg({
   database: process.env.POSTGRES_DB || 'nodedrpos',
   user: process.env.POSTGRES_USER || 'nodedr',
   password: process.env.POSTGRES_PASSWORD,
+  options: '-c timezone=America/Bogota',
 }, { schema: 'public' });
 
 const prisma = new PrismaClient({ adapter });

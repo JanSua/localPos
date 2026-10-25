@@ -31,21 +31,37 @@ const returnSchema = z.object({
 router.post('/', async (req, res) => {
   const parsed = returnSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos de la devolución no son válidos.', details: parsed.error.flatten() });
   }
   const body = parsed.data;
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.invoice.updateMany({
+        where: { id: body.invoiceId, status: 'COMPLETED' },
+        data: { status: 'COMPLETED' },
+      });
+      if (claimed.count !== 1) {
+        const existing = await tx.invoice.findUnique({
+          where: { id: body.invoiceId },
+          select: { id: true },
+        });
+        if (!existing) throw Object.assign(new Error('No se encontró la factura.'), { status: 404 });
+        throw Object.assign(new Error('No se pueden registrar devoluciones de una venta anulada.'), { status: 409 });
+      }
+
       const invoice = await tx.invoice.findUnique({ where: { id: body.invoiceId }, include: { items: true } });
-      if (!invoice) throw Object.assign(new Error('Invoice not found'), { status: 404 });
+      if (!invoice) throw Object.assign(new Error('No se encontró la factura.'), { status: 404 });
+      if (invoice.status !== 'COMPLETED') {
+        throw Object.assign(new Error('No se pueden registrar devoluciones de una venta anulada.'), { status: 409 });
+      }
 
       const itemMap = new Map(invoice.items.map((it) => [it.id, it]));
       const returnLines = [];
       for (const line of body.items) {
         const invoiceItem = itemMap.get(line.invoiceItemId);
         if (!invoiceItem || invoiceItem.invoiceId !== invoice.id) {
-          throw Object.assign(new Error('Invoice item not found on this invoice'), { status: 404 });
+          throw Object.assign(new Error('No se encontró el artículo en esta factura.'), { status: 404 });
         }
         const alreadyReturned = await tx.returnItem.aggregate({
           where: { invoiceItemId: invoiceItem.id },
@@ -54,7 +70,7 @@ router.post('/', async (req, res) => {
         const returnable = invoiceItem.quantity - (alreadyReturned._sum.quantity || 0);
         if (line.quantity > returnable) {
           throw Object.assign(
-            new Error(`Only ${returnable} of "${invoiceItem.name}" can still be returned`),
+            new Error(`Solo se pueden devolver ${returnable} unidades de "${invoiceItem.name}".`),
             { status: 409 }
           );
         }
@@ -69,7 +85,7 @@ router.post('/', async (req, res) => {
 
       if (body.refundMethod === 'DUE_ADJUST') {
         if (!invoice.customerId) {
-          throw Object.assign(new Error('This invoice has no customer to adjust a due for'), { status: 400 });
+          throw Object.assign(new Error('Esta factura no tiene un cliente al que ajustar la deuda.'), { status: 400 });
         }
       }
 
@@ -94,6 +110,7 @@ router.post('/', async (req, res) => {
       });
 
       for (const l of returnLines) {
+        if (l.invoiceItem.productId == null) continue;
         await tx.product.update({
           where: { id: l.invoiceItem.productId },
           data: { stock: { increment: l.quantity } },
@@ -108,7 +125,10 @@ router.post('/', async (req, res) => {
         }
       }
 
-      return { created, productIds: [...new Set(returnLines.map((l) => l.invoiceItem.productId))] };
+      return {
+        created,
+        productIds: [...new Set(returnLines.map((l) => l.invoiceItem.productId).filter((id) => id != null))],
+      };
     });
 
     if (result.productIds.length > 0) {
@@ -122,7 +142,7 @@ router.post('/', async (req, res) => {
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error(err);
-    res.status(status).json({ error: err.message || 'Return failed' });
+    res.status(status).json({ error: err.message || 'No se pudo procesar la devolución.' });
   }
 });
 
@@ -131,7 +151,7 @@ router.post('/', async (req, res) => {
 // line without re-deriving it from raw ReturnItem rows itself.
 router.get('/by-invoice/:invoiceId', async (req, res) => {
   const invoiceId = Number(req.params.invoiceId);
-  if (!Number.isInteger(invoiceId)) return res.status(400).json({ error: 'Invalid invoice id' });
+  if (!Number.isInteger(invoiceId)) return res.status(400).json({ error: 'El identificador de la factura no es válido.' });
   const returns = await prisma.return.findMany({
     where: { invoiceId },
     include: { items: true },

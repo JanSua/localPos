@@ -95,7 +95,7 @@ export interface Customer {
 
 export interface InvoiceItem {
   id: number;
-  productId: number;
+  productId: number | null;
   name: string;
   unit: string | null;
   quantity: number;
@@ -129,6 +129,9 @@ export interface Invoice {
   refundMode: "CASH" | "CREDIT" | null;
   pointsRedeemed: number;
   pointsEarned: number;
+  status: "COMPLETED" | "VOIDED";
+  voidedAt: string | null;
+  voidReason: string | null;
   createdAt: string;
   items: InvoiceItem[];
 }
@@ -145,7 +148,7 @@ export type RefundMethod = "CASH" | "UPI" | "CARD" | "DUE_ADJUST";
 export interface ReturnItem {
   id: number;
   invoiceItemId: number;
-  productId: number;
+  productId: number | null;
   name: string;
   quantity: number;
   refundAmount: number;

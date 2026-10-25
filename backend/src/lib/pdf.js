@@ -75,6 +75,7 @@ function estimateHeight({ shop, invoice, contentWidth }) {
     if (invoice.dueAmount > 0) h += 13;
   }
   if (shop.loyaltyEnabled && invoice.pointsEarned > 0) h += 14;
+  if (invoice.status === 'VOIDED') h += 20;
   h += 12 + 8; // spacer + rule
   h += wrappedLines(shop.receiptFooter || 'Gracias por su compra. ¡Vuelva pronto!', charsPerLineFull) * 10;
   return Math.max(300, Math.ceil(h) + 40);
@@ -108,6 +109,10 @@ function buildReceiptPdf({ shop, invoice }) {
 
     doc.font('Helvetica-Bold').fontSize(13).text(shop.shopName, { align: 'center' });
     doc.font('Helvetica').fontSize(8);
+    if (invoice.status === 'VOIDED') {
+      doc.font('Helvetica-Bold').fontSize(10).text('VENTA ANULADA', { align: 'center' });
+      doc.font('Helvetica').fontSize(8);
+    }
     if (shop.nit) doc.text(`NIT: ${shop.nit}`, { align: 'center' });
     const addr = [shop.address1, shop.address2].filter(Boolean).join(', ');
     if (addr) doc.text(addr, { align: 'center' });
@@ -119,8 +124,11 @@ function buildReceiptPdf({ shop, invoice }) {
     doc.moveDown(0.5);
     rule(doc, { dashed: true });
     const date = new Date(invoice.createdAt || Date.now());
-    doc.text(date.toLocaleString('es-CO'));
+    doc.text(date.toLocaleString('es-CO', { timeZone: 'America/Bogota' }));
     doc.text(`Factura: #${invoice.invoiceNumber}`);
+    if (invoice.status === 'VOIDED' && invoice.voidReason) {
+      doc.text(`Motivo de anulación: ${invoice.voidReason}`);
+    }
     doc.text(`Cliente: ${customerName}${invoice.customerPhone ? ` · ${invoice.customerPhone}` : ''}`);
     rule(doc, { dashed: true });
 

@@ -20,7 +20,7 @@ const loginLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many login attempts. Try again later.' },
+  message: { error: 'Demasiados intentos de inicio de sesión. Inténtalo más tarde.' },
 });
 
 const registerSchema = z.object({
@@ -46,12 +46,12 @@ router.get('/status', async (req, res) => {
 router.post('/register', async (req, res) => {
   const existing = await prisma.user.count();
   if (existing > 0) {
-    return res.status(403).json({ error: 'An admin account already exists' });
+    return res.status(403).json({ error: 'Ya existe una cuenta de administrador.' });
   }
 
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos enviados no son válidos.', details: parsed.error.flatten() });
   }
   const { name, email, password } = parsed.data;
 
@@ -68,12 +68,12 @@ router.post('/register', async (req, res) => {
 router.post('/login', loginLimiter, async (req, res) => {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input' });
+    return res.status(400).json({ error: 'Correo o contraseña no válidos.' });
   }
   const { email, password } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { email } });
-  const genericError = { error: 'Invalid email or password' };
+  const genericError = { error: 'Correo electrónico o contraseña incorrectos.' };
   // Always run a hash comparison to keep response timing uniform whether or
   // not the account exists, and never reveal which of the two was wrong.
   const hash = user?.password || '$2a$12$0000000000000000000000000000000000000000000000000000';
@@ -92,7 +92,7 @@ router.post('/logout', (req, res) => {
 
 router.get('/me', requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!user) return res.status(401).json({ error: 'Debes iniciar sesión para continuar.' });
   res.json(publicUser(user));
 });
 
@@ -104,10 +104,10 @@ const changePasswordSchema = z.object({
 router.post('/change-password', requireAuth, async (req, res) => {
   const parsed = changePasswordSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 8 caracteres.' });
   }
   const ok = await verifyPassword(req.user.id, parsed.data.currentPassword);
-  if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+  if (!ok) return res.status(401).json({ error: 'La contraseña actual es incorrecta.' });
 
   const passwordHash = await bcrypt.hash(parsed.data.newPassword, 12);
   await prisma.user.update({ where: { id: req.user.id }, data: { password: passwordHash } });
@@ -130,10 +130,10 @@ const createUserSchema = z.object({
 router.post('/users', requireAuth, requireAdmin, requirePasswordConfirm, async (req, res) => {
   const parsed = createUserSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del usuario no son válidos.', details: parsed.error.flatten() });
   }
   const exists = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-  if (exists) return res.status(409).json({ error: 'A user with that email already exists' });
+  if (exists) return res.status(409).json({ error: 'Ya existe un usuario con ese correo electrónico.' });
 
   const passwordHash = await bcrypt.hash(parsed.data.password, 12);
   const user = await prisma.user.create({
@@ -150,21 +150,21 @@ const updateUserSchema = z.object({
 });
 router.put('/users/:id', requireAuth, requireAdmin, requirePasswordConfirm, async (req, res) => {
   const id = Number(req.params.id);
-  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid user id' });
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del usuario no es válido.' });
 
   const parsed = updateUserSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
+    return res.status(400).json({ error: 'Los datos del usuario no son válidos.', details: parsed.error.flatten() });
   }
 
   const target = await prisma.user.findUnique({ where: { id } });
-  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (!target) return res.status(404).json({ error: 'No se encontró el usuario.' });
 
   // Guard against locking yourself out or removing the last admin.
   if (target.role === 'admin' && (parsed.data.role === 'cashier' || parsed.data.active === false)) {
     const adminCount = await prisma.user.count({ where: { role: 'admin', active: true } });
     if (adminCount <= 1) {
-      return res.status(400).json({ error: 'Cannot demote or disable the last active admin' });
+      return res.status(400).json({ error: 'No puedes cambiar el rol ni desactivar la última cuenta de administrador activa.' });
     }
   }
 
