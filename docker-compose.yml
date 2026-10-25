@@ -55,11 +55,6 @@ services:
 
     volumes:
       - app_data:/app/data
-      - /dev/bus/usb:/dev/bus/usb
-
-    device_cgroup_rules:
-      - "c 189:* rmw"
-      - "c 180:* rmw"
 
     networks:
       - nodedr-pos

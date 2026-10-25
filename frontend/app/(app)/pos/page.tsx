@@ -320,32 +320,10 @@ export default function PosPage() {
       });
       resetSale();
       if (shop?.autoPrintReceipt) {
-        if (shop.autoPrintMethod === "usb") {
-          // Send straight to the USB thermal printer — a plain async request,
-          // NOT the modal window.print() dialog. On a Debian till with no
-          // browser-configured printer that dialog has nothing to open and
-          // freezes the screen after every sale (which showed up as checkout
-          // "hanging", especially on store-credit/refund bills); the USB path
-          // has no dialog to hang on. Fire-and-forget with a toast on failure
-          // so a printer problem never blocks the next customer.
-          api
-            .post(`/print/${invoice.id}/usb`)
-            .catch((err) =>
-              show(
-                err instanceof ApiError
-                  ? err.message
-                  : "Error al imprimir automáticamente en impresora USB",
-                "error",
-              ),
-            );
-        } else {
-          // Deferred one tick so the "Sale complete" card is definitely
-          // painted before the OS print dialog opens — window.print() is
-          // modal in most browsers and pauses the tab, which otherwise can
-          // read as the app having frozen mid-checkout instead of having
-          // already finished.
-          setTimeout(() => openReceiptPrint(invoice.id), 0);
-        }
+        // Let the browser and operating system handle printer selection.
+        // Defer one tick so the completed-sale card is painted before the
+        // modal print dialog opens.
+        setTimeout(() => openReceiptPrint(invoice.id), 0);
       }
     } catch (err) {
       show(describeApiError(err, "Error al finalizar la venta"), "error");
@@ -372,7 +350,6 @@ export default function PosPage() {
     show,
     withPasswordConfirm,
     shop?.autoPrintReceipt,
-    shop?.autoPrintMethod,
   ]);
 
   useBarcodeScanner({

@@ -51,15 +51,9 @@ Set a strong alphanumeric PostgreSQL password in the install form. For
 administration from outside the host, use an SSH tunnel to localhost;
 never publish the PostgreSQL port to the public interface.
 
-The backend's `/dev/bus/usb` bind mount and `device_cgroup_rules` are for
-**optional** direct-USB thermal receipt printing (see
-[Barcode scanner](../README.md#barcode-scanner) and
-[Printing & receipts](../README.md#printing--receipts) in the main README).
-Nothing breaks if no printer is attached — receipts just print via the
-browser dialog or download as a PDF instead. The cgroup rules are scoped to
-exactly the two USB device majors printing needs (`189` usbfs, `180`
-usblp), not full `privileged: true`, so the container still can't see or
-touch anything else on the host.
+Receipts are rendered by the browser and printed using the printer configured
+on the device running the browser, or downloaded as PDF. The backend does not
+need access to printer hardware.
 
 ## Publishing new image versions
 

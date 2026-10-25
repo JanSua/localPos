@@ -26,13 +26,7 @@ export function BarcodeCanvas({
       return;
     }
 
-    try {
-      JsBarcode(canvas, value, { format: "EAN13", width: 2, height: 70, displayValue: true, margin: 8 });
-    } catch {
-      // Not a valid EAN-13 (e.g. a manufacturer barcode in a different
-      // format) — CODE128 accepts any string, so the label still renders.
-      JsBarcode(canvas, value, { format: "CODE128", width: 2, height: 70, displayValue: true, margin: 8 });
-    }
+    JsBarcode(canvas, value, { format: "CODE128", width: 2, height: 70, displayValue: true, margin: 8 });
   }, [value, format]);
 
   return <canvas ref={canvasRef} id={id} className={className} />;

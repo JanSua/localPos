@@ -31,8 +31,6 @@ export interface ShopSettings {
   receiptFooter: string;
   showGst: boolean;
   autoPrintReceipt: boolean;
-  usbPrinterWidth: number;
-  autoPrintMethod: "browser" | "usb";
   lowStockAlert: number;
   allowNegativeStock: boolean;
   pincode: string | null;

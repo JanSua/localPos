@@ -443,57 +443,11 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
   );
 }
 
-type PrinterDiag = {
-  lpDevices: string[];
-  libusbPrinter: { id: string } | null;
-  canPrint: boolean;
-  notes: string[];
-};
-
 function ReceiptTab({ settings }: { settings: ShopSettings }) {
   const save = useSaver();
-  const { show } = useToast();
   const [header, setHeader] = useState(settings.receiptHeader ?? "");
   const [footer, setFooter] = useState(settings.receiptFooter ?? "");
   const [autoPrint, setAutoPrint] = useState(settings.autoPrintReceipt);
-  const [autoPrintMethod, setAutoPrintMethod] = useState(
-    settings.autoPrintMethod ?? "browser",
-  );
-  const [usbWidth, setUsbWidth] = useState(String(settings.usbPrinterWidth));
-  const [diag, setDiag] = useState<PrinterDiag | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [testing, setTesting] = useState(false);
-
-  async function checkPrinter() {
-    setChecking(true);
-    try {
-      setDiag(await api.get<PrinterDiag>("/print/diagnostics"));
-    } catch (err) {
-      show(
-        err instanceof ApiError
-          ? err.message
-          : "No se pudo verificar la impresora",
-        "error",
-      );
-    } finally {
-      setChecking(false);
-    }
-  }
-
-  async function testPrint() {
-    setTesting(true);
-    try {
-      await api.post("/print/test");
-      show("Ticket de prueba enviado a la impresora USB", "success");
-    } catch (err) {
-      show(
-        err instanceof ApiError ? err.message : "La impresión de prueba falló",
-        "error",
-      );
-    } finally {
-      setTesting(false);
-    }
-  }
 
   return (
     <Card className="max-w-2xl p-6">
@@ -504,47 +458,16 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
             receiptHeader: header,
             receiptFooter: footer,
             autoPrintReceipt: autoPrint,
-            autoPrintMethod,
-            usbPrinterWidth: Number(usbWidth),
           });
         }}
         className="flex flex-col gap-4"
       >
         <Toggle
           label="Imprimir automáticamente después de cada venta"
-          description="Evita el clic adicional en la página de cobro — el recibo se envía a tu impresora en el momento en que se completa una venta"
+          description="Abre el diálogo de impresión del navegador al completar cada venta para que elijas la impresora configurada en este equipo."
           checked={autoPrint}
           onChange={setAutoPrint}
         />
-        {autoPrint && (
-          <Select
-            label="Impresión automática usando"
-            value={autoPrintMethod}
-            onChange={(e) =>
-              setAutoPrintMethod(e.target.value as "browser" | "usb")
-            }
-            options={[
-              {
-                value: "browser",
-                label:
-                  "Diálogo de impresión del navegador (Windows + controlador de impresora)",
-              },
-              {
-                value: "usb",
-                label:
-                  "Impresora térmica USB directa (sin diálogo — para una caja Debian)",
-              },
-            ]}
-          />
-        )}
-        {autoPrint && autoPrintMethod === "usb" && (
-          <p className="-mt-2 text-xs text-foreground/60">
-            Envía el recibo directamente a la impresora USB sin ventana
-            emergente. Úsalo en una caja donde el diálogo de impresión del
-            navegador no tenga impresora configurada — de lo contrario ese
-            diálogo puede congelar la pantalla después de cada venta.
-          </p>
-        )}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="rh" className="text-sm font-medium text-foreground">
             Encabezado del recibo (impreso encima del nombre de la tienda)
@@ -569,80 +492,10 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
           />
         </div>
-        <Select
-          label="Ancho de papel de la impresora USB (para el botón 'Imprimir por USB')"
-          value={usbWidth}
-          onChange={(e) => setUsbWidth(e.target.value)}
-          options={[
-            { value: "80", label: "80mm (estándar)" },
-            { value: "58", label: "58mm (compacto)" },
-          ]}
-        />
         <Button type="submit" className="self-start">
           Guardar configuración del recibo
         </Button>
       </form>
-
-      {/* USB printer check — one click to see what the backend detects and to
-          send a physical test slip, so a shop can confirm the printer works
-          without ringing up a real sale. */}
-      <div className="mt-6 border-t border-border pt-5">
-        <h3 className="text-sm font-semibold text-foreground">
-          Verificación de impresora USB
-        </h3>
-        <p className="mt-1 text-xs text-foreground/60">
-          Confirma que el botón &ldquo;Imprimir por USB&rdquo; puede alcanzar
-          una impresora térmica en esta máquina.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={checkPrinter}
-            disabled={checking}
-          >
-            {checking ? "Verificando…" : "Verificar impresora"}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={testPrint}
-            disabled={testing}
-          >
-            {testing ? "Imprimiendo…" : "Imprimir ticket de prueba"}
-          </Button>
-        </div>
-        {diag && (
-          <div
-            className={`mt-3 rounded-lg border p-3 text-xs ${
-              diag.canPrint
-                ? "border-success/30 bg-success/10 text-success"
-                : "border-danger/30 bg-danger/10 text-danger"
-            }`}
-          >
-            <p className="font-semibold">
-              {diag.canPrint
-                ? "Impresora detectada — la impresión USB directa debería funcionar."
-                : "No se detectó impresora USB."}
-            </p>
-            <ul className="mt-1.5 space-y-0.5 text-foreground/70">
-              <li>
-                Nodos de impresora del kernel:{" "}
-                {diag.lpDevices.length > 0
-                  ? diag.lpDevices.join(", ")
-                  : "ninguno"}
-              </li>
-              <li>
-                Dispositivo USB clase impresora:{" "}
-                {diag.libusbPrinter ? diag.libusbPrinter.id : "ninguno"}
-              </li>
-              {diag.notes.map((n, i) => (
-                <li key={i}>{n}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
     </Card>
   );
 }

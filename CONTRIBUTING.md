@@ -180,20 +180,13 @@ will be asked to change before merge:
 
 ## Working on hardware features
 
-Two hardware integrations have real quirks documented in the README —
-read the relevant section before changing either:
+The barcode scanner has real quirks documented in the README — read the
+relevant section before changing it:
 
 - **Barcode scanner** ([`useBarcodeScanner`](frontend/hooks/useBarcodeScanner.ts)) —
   distinguishes scanner input from human typing by inter-keystroke timing.
   Don't add a "press a key to start scanning" mode; the whole point is
   that any HID scanner works with zero configuration.
-- **Direct-USB ESC/POS printing** ([`backend/src/lib/escposUsb.js`](backend/src/lib/escposUsb.js)) —
-  tries the kernel `usblp` character device first, libusb second. This is
-  Linux-only and needs the `/dev/bus/usb` mount + `device_cgroup_rules` in
-  `docker-compose.yml` — see [Direct-USB printer setup](./README.md#direct-usb-escpos-printer-setup)
-  for the full explanation of why, including why the backend container
-  runs as root (it's required, not an oversight — don't "fix" it by
-  adding a `USER` line).
 
 ## Making a change
 
@@ -241,10 +234,7 @@ Open an issue with:
 - Exact repro steps.
 - Install method (Docker Compose / CasaOS / local dev)
   and versions (Node, OS, Docker if relevant).
-- For a printing bug: which transport (browser Print, Download PDF,
-  Print via USB), printer model, and `lsusb` / `dmesg | grep usblp`
-  output if it's a direct-USB issue (see
-  [Troubleshooting](./README.md#troubleshooting-linux-till)).
+- For a printing bug: browser Print or Download PDF, and the printer model.
 
 Money-correctness bugs (a total that doesn't match line items, a return
 that refunds more than was paid, a due/loyalty balance that drifts) are

@@ -51,10 +51,6 @@ services:
       - type: bind
         source: /DATA/AppData/$AppID/data
         target: /app/data
-      - /dev/bus/usb:/dev/bus/usb
-    device_cgroup_rules:
-      - "c 189:* rmw"
-      - "c 180:* rmw"
     depends_on:
       db:
         condition: service_healthy
@@ -72,9 +68,6 @@ services:
         - container: /app/data
           description:
             en_US: Persistent session-signing secret.
-        - container: /dev/bus/usb
-          description:
-            en_US: USB passthrough for optional direct-USB thermal receipt printing.
 
   frontend:
     image: ghcr.io/raktim94/nodedr-pos-frontend:develop
@@ -136,8 +129,8 @@ x-casaos:
         port is bound to localhost only.
 
         On first launch you'll create an admin account and set up your shop.
-        Optional: direct-USB thermal receipt printing uses the bundled
-        `/dev/bus/usb` passthrough.
+        Receipts use the browser's print dialog, where you can select a
+        printer configured on the device running the browser.
   index: /
   scheme: http
   port_map: "1994"
