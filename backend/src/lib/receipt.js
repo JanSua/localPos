@@ -147,7 +147,7 @@ function buildReceiptHtml({ shop, invoice }) {
   <div class="receipt">
     ${shop.receiptHeader ? `<p class="center muted">${esc(shop.receiptHeader).replace(/\n/g, '<br>')}</p>` : ''}
     <h1>${esc(shop.shopName)}</h1>
-    ${shop.legalName ? `<p class="center muted">${esc(shop.legalName)}</p>` : ''}
+    ${shop.nit ? `<p class="center muted">NIT: ${esc(shop.nit)}</p>` : ''}
     <p class="center muted">
       ${esc(shop.address1)}${shop.address2 ? `, ${esc(shop.address2)}` : ''}<br>
       ${[shop.city, shop.state].filter(Boolean).map(esc).join(', ')}

@@ -16,6 +16,7 @@ const router = express.Router();
 const fields = {
   shopName: z.string().trim().min(1).max(120),
   legalName: z.string().trim().max(160).optional().or(z.literal('')),
+  nit: z.string().trim().optional().or(z.literal('')),
   address1: z.string().trim().min(1).max(200),
   address2: z.string().trim().max(200).optional().or(z.literal('')),
   city: z.string().trim().max(80).optional().or(z.literal('')),
@@ -54,7 +55,7 @@ const createSchema = z.object({
   autoPrintReceipt: fields.autoPrintReceipt.default(false),
   usbPrinterWidth: fields.usbPrinterWidth.default(58),
   lowStockAlert: fields.lowStockAlert.default(5),
-  allowNegativeStock: fields.allowNegativeStock.default(false),
+  allowNegativeStock: fields.allowNegativeStock.default(true),
 });
 
 // PUT (partial update): no defaults anywhere, so an omitted key is simply

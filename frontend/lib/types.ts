@@ -12,6 +12,7 @@ export interface ShopSettings {
   id: number;
   shopName: string;
   legalName: string | null;
+  nit: string | null;
   address1: string;
   address2: string | null;
   city: string | null;

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { MoneyField } from "@/components/ui/MoneyField";
@@ -22,7 +21,6 @@ import {
   isValidGstinFormat,
   isValidPanFormat,
 } from "@/lib/masters";
-import type { PinCodeRecord } from "@/hooks/useMasters";
 import type { ShopSettings } from "@/lib/types";
 import { UsersPanel } from "./UsersPanel";
 import { ReferenceDataTab } from "./ReferenceDataTab";
@@ -37,6 +35,11 @@ const TABS = [
   "Personal",
 ] as const;
 type Tab = (typeof TABS)[number];
+const HIDDEN_TABS = new Set<Tab>([
+  "Impuestos y Lealtad",
+  "Datos de Referencia",
+  "Integraciones",
+]);
 
 export default function SettingsPage() {
   const {
@@ -85,7 +88,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-semibold text-foreground">Configuración</h1>
 
       <div className="flex flex-wrap gap-1 border-b border-border">
-        {TABS.map((t) => (
+        {TABS.filter((t) => !HIDDEN_TABS.has(t)).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -127,7 +130,6 @@ function useSaver() {
 function CompanyTab({ settings }: { settings: ShopSettings }) {
   const save = useSaver();
   const { data: currencies } = useCurrencies();
-  const { show } = useToast();
   // Initialised once from the loaded settings (the parent only renders this
   // tab after settings load, and remounts it on tab switch).
   // allowNegativeStock defaults to `true` when the backend has no stored
@@ -136,7 +138,6 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
     ...settings,
     allowNegativeStock: settings.allowNegativeStock ?? true,
   });
-  const [lookingUp, setLookingUp] = useState(false);
   const currencyOptions = Object.entries(currencies ?? {}).map(
     ([value, c]) => ({
       value,
@@ -146,34 +147,6 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
   const set = (k: keyof ShopSettings, v: string | number) =>
     setForm((f) => ({ ...f, [k]: v }));
 
-  // Only works once PIN codes have been imported on the Reference Data tab
-  // — no PIN database ships with the app (see README).
-  async function lookupPincode() {
-    const pin = (form.pincode ?? "").trim();
-    if (!pin) return;
-    setLookingUp(true);
-    try {
-      const record = await api.get<PinCodeRecord>(
-        `/masters/pincodes/${encodeURIComponent(pin)}`,
-      );
-      setForm((f) => ({
-        ...f,
-        city: record.district || f.city,
-        state: record.state || f.state,
-      }));
-      show(`${record.area || record.district}, ${record.state}`, "success");
-    } catch (err) {
-      show(
-        err instanceof ApiError
-          ? err.message
-          : "Código PIN no encontrado — importa los códigos PIN en Datos de Referencia primero",
-        "info",
-      );
-    } finally {
-      setLookingUp(false);
-    }
-  }
-
   return (
     <Card className="max-w-2xl p-6">
       <form
@@ -181,10 +154,9 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
           e.preventDefault();
           save({
             shopName: form.shopName,
-            legalName: form.legalName || "",
+            nit: form.nit || "",
             address1: form.address1,
             address2: form.address2 || "",
-            pincode: form.pincode || "",
             city: form.city || "",
             state: form.state || "",
             phone: form.phone || "",
@@ -202,9 +174,10 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
           onChange={(e) => set("shopName", e.target.value)}
         />
         <Field
-          label="Razón social"
-          value={form.legalName ?? ""}
-          onChange={(e) => set("legalName", e.target.value)}
+          label="NIT"
+          value={form.nit ?? ""}
+          onChange={(e) => set("nit", e.target.value)}
+          placeholder="Número de identificación tributaria"
         />
         <Field
           label="Dirección línea 1"
@@ -216,25 +189,6 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
           value={form.address2 ?? ""}
           onChange={(e) => set("address2", e.target.value)}
         />
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Field
-              label="Código PIN"
-              value={form.pincode ?? ""}
-              onChange={(e) => set("pincode", e.target.value)}
-              placeholder="Rellena automáticamente ciudad/estado abajo, si está importado"
-            />
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={lookupPincode}
-            disabled={lookingUp}
-            aria-label="Buscar código PIN"
-          >
-            <Search className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
         <div className="grid grid-cols-2 gap-4">
           <Field
             label="Ciudad"

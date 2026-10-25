@@ -44,7 +44,7 @@ function estimateHeight({ shop, invoice, contentWidth }) {
   const charsPerLineFull = Math.max(1, Math.floor(30 * widthScale));
   let h = 40; // top/bottom margins + rounding buffer
   h += 16; // shop name
-  if (shop.legalName) h += 10;
+  if (shop.nit) h += 10;
   if ([shop.address1, shop.address2].filter(Boolean).join(', ')) h += 10;
   if ([shop.city, shop.state].filter(Boolean).join(', ')) h += 10;
   if (shop.phone) h += 10;
@@ -108,7 +108,7 @@ function buildReceiptPdf({ shop, invoice }) {
 
     doc.font('Helvetica-Bold').fontSize(13).text(shop.shopName, { align: 'center' });
     doc.font('Helvetica').fontSize(8);
-    if (shop.legalName) doc.text(shop.legalName, { align: 'center' });
+    if (shop.nit) doc.text(`NIT: ${shop.nit}`, { align: 'center' });
     const addr = [shop.address1, shop.address2].filter(Boolean).join(', ');
     if (addr) doc.text(addr, { align: 'center' });
     const cityState = [shop.city, shop.state].filter(Boolean).join(', ');
