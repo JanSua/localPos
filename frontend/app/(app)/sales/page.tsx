@@ -17,8 +17,10 @@ import type { RefundMethod } from "@/lib/types";
 
 export default function SalesPage() {
   const [search, setSearch] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const { data: invoices, isLoading } = useInvoices(search);
+  const { data: invoices, isLoading } = useInvoices(search, from, to);
   const { data: user } = useMe();
   const { data: shop } = useShopSettings();
   const sym = shop?.currencySymbol || "Rs.";
@@ -33,16 +35,40 @@ export default function SalesPage() {
       </div>
 
       <Card className="p-5">
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-border px-3 py-2">
-          <Search className="h-4 w-4 text-foreground/40" aria-hidden="true" />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por # de factura, cliente o teléfono…"
-            aria-label="Buscar facturas"
-            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/40"
-          />
+        <div className="mb-4 flex flex-wrap gap-3">
+          <div className="flex min-w-60 flex-1 items-center gap-2 rounded-lg border border-border px-3 py-2">
+            <Search className="h-4 w-4 text-foreground/40" aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por # de factura, cliente o teléfono…"
+              aria-label="Buscar facturas"
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/40"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-foreground/60">
+            Desde
+            <input
+              type="date"
+              value={from}
+              max={to || undefined}
+              onChange={(e) => setFrom(e.target.value)}
+              aria-label="Filtrar ventas desde la fecha"
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-foreground/60">
+            Hasta
+            <input
+              type="date"
+              value={to}
+              min={from || undefined}
+              onChange={(e) => setTo(e.target.value)}
+              aria-label="Filtrar ventas hasta la fecha"
+              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
+            />
+          </label>
         </div>
 
         {isLoading ? (
@@ -344,7 +370,7 @@ function InvoiceDrawer({
               </div>
             )}
 
-            {invoice.status === "COMPLETED" && (
+            {isAdmin && invoice.status === "COMPLETED" && (
               <div className="rounded-lg border border-border p-4">
               <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-foreground">
                 <Undo2 className="h-4 w-4" aria-hidden="true" />

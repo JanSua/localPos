@@ -21,16 +21,19 @@ import {
   useSalesSummary,
 } from "@/hooks/useInvoices";
 import { useShopSettings } from "@/hooks/useShopSettings";
+import { useMe } from "@/hooks/useAuth";
 import { formatMoney } from "@/lib/format";
 import { formatColombiaDateTime } from "@/lib/colombia-time";
 
 export default function DashboardPage() {
   const { data: shop } = useShopSettings();
+  const { data: user } = useMe();
+  const isAdmin = user?.role === "admin";
   const { data: products } = useProducts();
   const { data: lowStock } = useLowStock();
   const { data: summary } = useSalesSummary();
   const { data: invoices } = useInvoices();
-  const { data: analytics } = useSalesAnalytics();
+  const { data: analytics } = useSalesAnalytics(undefined, undefined, isAdmin);
   const recentInvoices = (invoices ?? [])
     .filter((invoice) => invoice.status === "COMPLETED")
     .slice(0, 8);
@@ -60,12 +63,14 @@ export default function DashboardPage() {
             Vista general de la tienda.
           </p>
         </div>
-        <a href="/api/invoices/export.csv" download>
-          <Button type="button" variant="secondary">
-            <Download className="h-4 w-4" aria-hidden="true" />
-            Exportar ventas a CSV
-          </Button>
-        </a>
+        {isAdmin && (
+          <a href="/api/invoices/export.csv" download>
+            <Button type="button" variant="secondary">
+              <Download className="h-4 w-4" aria-hidden="true" />
+              Exportar ventas a CSV
+            </Button>
+          </a>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -73,15 +78,15 @@ export default function DashboardPage() {
           icon={Receipt}
           label="Ventas de hoy"
           value={`${summary?.todaysCount ?? 0}`}
-          delta={salesDelta}
-          sparkline={trend.map((t) => t.count)}
+          delta={isAdmin ? salesDelta : undefined}
+          sparkline={isAdmin ? trend.map((t) => t.count) : undefined}
         />
         <StatCard
           icon={TrendingUp}
           label="Total vendido hoy"
           value={money(summary?.todaysRevenue ?? 0)}
-          delta={revenueDelta}
-          sparkline={trend.map((t) => t.revenue)}
+          delta={isAdmin ? revenueDelta : undefined}
+          sparkline={isAdmin ? trend.map((t) => t.revenue) : undefined}
         />
         <StatCard
           icon={Package}
@@ -96,7 +101,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      <SalesCharts sym={sym} />
+      {isAdmin && <SalesCharts sym={sym} />}
 
       <div>
         <Card className="p-5">

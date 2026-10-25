@@ -1,11 +1,18 @@
 const express = require('express');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { notifyStockChange } = require('../lib/webhooks');
 
 const router = express.Router();
 router.use(requireAuth);
+
+function presentProduct(product, user) {
+  if (user.role === 'admin') return product;
+  const { purchasePrice, ...visibleProduct } = product;
+  void purchasePrice;
+  return visibleProduct;
+}
 
 // No `.default()` here on purpose — see settings.js for why. `.default()`
 // fires whenever a key is absent, which would make `productSchema.partial()`
@@ -76,7 +83,7 @@ router.get('/', async (req, res) => {
       : undefined,
     orderBy: { name: 'asc' },
   });
-  res.json(products);
+  res.json(products.map((product) => presentProduct(product, req.user)));
 });
 
 // GET /api/products/low-stock — dashboard widget
@@ -87,17 +94,17 @@ router.get('/low-stock', async (req, res) => {
     where: { stock: { lte: threshold } },
     orderBy: { stock: 'asc' },
   });
-  res.json({ threshold, products });
+  res.json({ threshold, products: products.map((product) => presentProduct(product, req.user)) });
 });
 
 // GET /api/products/barcode/:barcode — scanner lookup
 router.get('/barcode/:barcode', async (req, res) => {
   const product = await prisma.product.findUnique({ where: { barcode: req.params.barcode } });
   if (!product) return res.status(404).json({ error: 'No se encontró el producto.' });
-  res.json(product);
+  res.json(presentProduct(product, req.user));
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Los datos del producto no son válidos.', details: parsed.error.flatten() });
@@ -119,7 +126,7 @@ router.post('/', async (req, res) => {
   res.status(201).json(product);
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del producto no es válido.' });
 
@@ -149,7 +156,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del producto no es válido.' });
   try {

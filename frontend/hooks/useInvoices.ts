@@ -7,8 +7,8 @@ import type { Invoice } from "@/lib/types";
 export interface SalesSummary {
   todaysCount: number;
   todaysRevenue: number;
-  totalSales: number;
-  totalRevenue: number;
+  totalSales?: number;
+  totalRevenue?: number;
 }
 
 export interface SalesAnalytics {
@@ -18,10 +18,16 @@ export interface SalesAnalytics {
   granularity: "day" | "month";
 }
 
-export function useInvoices(search = "") {
+export function useInvoices(search = "", from = "", to = "") {
+  const query = new URLSearchParams();
+  if (search) query.set("q", search);
+  if (from) query.set("from", from);
+  if (to) query.set("to", to);
+  const queryString = query.toString();
+
   return useQuery({
-    queryKey: ["invoices", search],
-    queryFn: () => api.get<Invoice[]>(`/invoices${search ? `?q=${encodeURIComponent(search)}` : ""}`),
+    queryKey: ["invoices", search, from, to],
+    queryFn: () => api.get<Invoice[]>(`/invoices${queryString ? `?${queryString}` : ""}`),
   });
 }
 
@@ -61,7 +67,7 @@ export function useVoidInvoice() {
   });
 }
 
-export function useSalesAnalytics(from?: string, to?: string) {
+export function useSalesAnalytics(from?: string, to?: string, enabled = true) {
   const query = new URLSearchParams();
   if (from) query.set("from", from);
   if (to) query.set("to", to);
@@ -74,6 +80,6 @@ export function useSalesAnalytics(from?: string, to?: string) {
         `/invoices/analytics${search ? `?${search}` : ""}`,
       ),
     refetchInterval: 60_000,
-    enabled: Boolean(from) === Boolean(to),
+    enabled: enabled && Boolean(from) === Boolean(to),
   });
 }

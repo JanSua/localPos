@@ -69,7 +69,7 @@ router.get('/phone/:phone', async (req, res) => {
   res.json(customer);
 });
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', async (req, res) => {
   const parsed = customerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Los datos del cliente no son válidos.', details: parsed.error.flatten() });
@@ -135,7 +135,7 @@ router.get('/:id/due-payments', async (req, res) => {
   res.json(payments);
 });
 
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) return res.status(400).json({ error: 'El identificador del cliente no es válido.' });
   const parsed = customerSchema.partial().safeParse(req.body);

@@ -487,10 +487,31 @@ router.post('/:id/void', requireAdmin, async (req, res) => {
 // GET /api/invoices?q=&from=&to=
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').toString().trim();
-  const where = q
-    ? { OR: [{ invoiceNumber: { contains: q } }, { customerName: { contains: q } }, { customerPhone: { contains: q } }] }
-    : undefined;
-  const invoices = await prisma.invoice.findMany({ where, orderBy: { createdAt: 'desc' }, take: 300 });
+  const where = {};
+  if (q) {
+    where.OR = [
+      { invoiceNumber: { contains: q } },
+      { customerName: { contains: q } },
+      { customerPhone: { contains: q } },
+    ];
+  }
+  const from = req.query.from?.toString();
+  const to = req.query.to?.toString();
+  const start = from ? parseBogotaDate(from) : null;
+  const lastDay = to ? parseBogotaDate(to) : null;
+  if ((from && !start) || (to && !lastDay) || (start && lastDay && start > lastDay)) {
+    return res.status(400).json({ error: 'El rango de fechas no es válido.' });
+  }
+  if (start || lastDay) {
+    where.createdAt = {};
+    if (start) where.createdAt.gte = start;
+    if (lastDay) where.createdAt.lt = addDays(lastDay, 1);
+  }
+  const invoices = await prisma.invoice.findMany({
+    where: Object.keys(where).length ? where : undefined,
+    orderBy: { createdAt: 'desc' },
+    take: 300,
+  });
   res.json(invoices);
 });
 
@@ -500,20 +521,25 @@ router.get('/summary', async (req, res) => {
   const end = addDays(start, 1);
   const [todays, all] = await Promise.all([
     prisma.invoice.findMany({ where: { status: 'COMPLETED', createdAt: { gte: start, lt: end } } }),
-    prisma.invoice.aggregate({ where: { status: 'COMPLETED' }, _sum: { totalAmount: true }, _count: true }),
+    req.user.role === 'admin'
+      ? prisma.invoice.aggregate({ where: { status: 'COMPLETED' }, _sum: { totalAmount: true }, _count: true })
+      : Promise.resolve(null),
   ]);
   const todaysRevenue = round2(todays.reduce((s, i) => s + i.totalAmount, 0));
-  res.json({
+  const summary = {
     todaysCount: todays.length,
     todaysRevenue,
-    totalSales: all._count,
-    totalRevenue: round2(all._sum.totalAmount || 0),
-  });
+  };
+  if (all) {
+    summary.totalSales = all._count;
+    summary.totalRevenue = round2(all._sum.totalAmount || 0);
+  }
+  res.json(summary);
 });
 
 // GET /api/invoices/analytics — sales trend, top products, and payment mix
 // for a selected date range. Without dates, retains the previous 14-day view.
-router.get('/analytics', async (req, res) => {
+router.get('/analytics', requireAdmin, async (req, res) => {
   const hasFrom = req.query.from != null;
   const hasTo = req.query.to != null;
   if (hasFrom !== hasTo) {
@@ -615,7 +641,7 @@ function csvCell(value) {
 
 // GET /api/invoices/export.csv?from=&to= — one row per invoice. Defaults to
 // all invoices; from/to (ISO dates) narrow the range for a period report.
-router.get('/export.csv', async (req, res) => {
+router.get('/export.csv', requireAdmin, async (req, res) => {
   const where = {};
   if (req.query.from || req.query.to) {
     where.createdAt = {};

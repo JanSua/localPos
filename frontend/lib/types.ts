@@ -48,7 +48,7 @@ export interface Product {
   category: string | null;
   hsn: string | null;
   unit: string | null;
-  purchasePrice: number;
+  purchasePrice?: number;
   sellingPrice: number;
   taxRate: number;
   discountType: "percent" | "amount" | null;

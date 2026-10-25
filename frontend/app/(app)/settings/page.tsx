@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Toggle } from "@/components/ui/Toggle";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/Toast";
+import { useMe } from "@/hooks/useAuth";
 import { usePasswordConfirm } from "@/components/PasswordConfirm";
 import {
   useCurrencies,
@@ -49,7 +50,18 @@ export default function SettingsPage() {
     error,
     refetch,
   } = useShopSettings();
-  const [tab, setTab] = useState<Tab>("Empresa");
+  const { data: user } = useMe();
+  const isAdmin = user?.role === "admin";
+  const [selectedTab, setSelectedTab] = useState<Tab | null>(null);
+  const allowedTabs: readonly Tab[] = isAdmin
+    ? TABS.filter((t) => !HIDDEN_TABS.has(t))
+    : ["Recibo", "Contraseña"];
+  const tab =
+    selectedTab && allowedTabs.includes(selectedTab)
+      ? selectedTab
+      : isAdmin
+        ? "Empresa"
+        : "Recibo";
 
   if (isLoading) {
     return (
@@ -88,10 +100,10 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-semibold text-foreground">Configuración</h1>
 
       <div className="flex flex-wrap gap-1 border-b border-border">
-        {TABS.filter((t) => !HIDDEN_TABS.has(t)).map((t) => (
+        {allowedTabs.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setSelectedTab(t)}
             className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === t
                 ? "border-brand text-brand"
@@ -103,13 +115,13 @@ export default function SettingsPage() {
         ))}
       </div>
 
-      {tab === "Empresa" && <CompanyTab settings={settings} />}
-      {tab === "Impuestos y Lealtad" && <TaxLoyaltyTab settings={settings} />}
-      {tab === "Recibo" && <ReceiptTab settings={settings} />}
-      {tab === "Datos de Referencia" && <ReferenceDataTab />}
-      {tab === "Integraciones" && <IntegrationsTab />}
+      {isAdmin && tab === "Empresa" && <CompanyTab settings={settings} />}
+      {isAdmin && tab === "Impuestos y Lealtad" && <TaxLoyaltyTab settings={settings} />}
+      {tab === "Recibo" && <ReceiptTab settings={settings} readOnly={!isAdmin} />}
+      {isAdmin && tab === "Datos de Referencia" && <ReferenceDataTab />}
+      {isAdmin && tab === "Integraciones" && <IntegrationsTab />}
       {tab === "Contraseña" && <PasswordTab />}
-      {tab === "Personal" && <UsersPanel />}
+      {isAdmin && tab === "Personal" && <UsersPanel />}
     </div>
   );
 }
@@ -398,7 +410,13 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
   );
 }
 
-function ReceiptTab({ settings }: { settings: ShopSettings }) {
+function ReceiptTab({
+  settings,
+  readOnly,
+}: {
+  settings: ShopSettings;
+  readOnly: boolean;
+}) {
   const save = useSaver();
   const [header, setHeader] = useState(settings.receiptHeader ?? "");
   const [footer, setFooter] = useState(settings.receiptFooter ?? "");
@@ -421,6 +439,7 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
         }}
         className="flex flex-col gap-4"
       >
+        <fieldset disabled={readOnly} className="flex flex-col gap-4">
         <Toggle
           label="Imprimir automáticamente después de cada venta"
           description="Abre el diálogo de impresión del navegador al completar cada venta para que elijas la impresora configurada en este equipo."
@@ -460,9 +479,12 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
             className="rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-brand"
           />
         </div>
-        <Button type="submit" className="self-start">
-          Guardar configuración del recibo
-        </Button>
+        {!readOnly && (
+          <Button type="submit" className="self-start">
+            Guardar configuración del recibo
+          </Button>
+        )}
+        </fieldset>
       </form>
     </Card>
   );

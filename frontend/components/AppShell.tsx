@@ -32,7 +32,6 @@ const NAV_ITEMS = [
     href: "/settings",
     label: "Configuración",
     icon: Settings,
-    adminOnly: true,
   },
 ];
 
@@ -81,9 +80,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !item.adminOnly || me?.role === "admin",
-  );
+  const visibleItems = NAV_ITEMS;
   const sym = shop?.currencySymbol || "Rs.";
   const dateParts = now
     ? new Intl.DateTimeFormat("es-CO", {

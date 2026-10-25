@@ -20,6 +20,7 @@ import { BarcodeLabelModal } from "@/components/BarcodeLabelModal";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { useDeleteProduct, useProducts } from "@/hooks/useProducts";
 import { useShopSettings } from "@/hooks/useShopSettings";
+import { useMe } from "@/hooks/useAuth";
 import { useToast } from "@/components/Toast";
 import { api, ApiError } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
@@ -48,6 +49,8 @@ export default function InventoryPage() {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { data: shop } = useShopSettings();
+  const { data: user } = useMe();
+  const isAdmin = user?.role === "admin";
   const { data: products, isLoading } = useProducts(search);
   const deleteProduct = useDeleteProduct();
   const { show } = useToast();
@@ -64,7 +67,7 @@ export default function InventoryPage() {
               sensitivity: "base",
               numeric: sortKey === "barcode",
             })
-          : a[sortKey] - b[sortKey];
+          : (a[sortKey] ?? 0) - (b[sortKey] ?? 0);
       return sortDirection === "asc" ? comparison : -comparison;
     });
   }, [products, sortDirection, sortKey]);
@@ -124,7 +127,7 @@ export default function InventoryPage() {
 
   useBarcodeScanner({
     onScan: handleScan,
-    enabled: modal === null && stockTarget === null,
+    enabled: isAdmin && modal === null && stockTarget === null,
   });
 
   async function handleDelete(product: Product) {
@@ -154,14 +157,17 @@ export default function InventoryPage() {
           <h1 className="text-2xl font-semibold text-foreground">Inventario</h1>
           <p className="flex items-center gap-1.5 text-sm text-foreground/60">
             <ScanBarcode className="h-4 w-4 shrink-0" aria-hidden="true" />
-            Escanea un código de barras para ir a un producto, o usa los iconos
-            de edición y stock en cada fila.
+            {isAdmin
+              ? "Escanea un código de barras para ir a un producto, o usa los iconos de edición y stock en cada fila."
+              : "Consulta productos y existencias, o imprime etiquetas de código de barras."}
           </p>
         </div>
-        <Button onClick={() => setModal({ mode: "add" })}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Agregar producto
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setModal({ mode: "add" })}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Agregar producto
+          </Button>
+        )}
       </div>
 
       <Card className="p-5">
@@ -183,8 +189,9 @@ export default function InventoryPage() {
           </p>
         ) : !products || products.length === 0 ? (
           <p className="py-10 text-center text-sm text-foreground/50">
-            Aún no hay productos. Escanea un código de barras o haz clic en
-            &quot;Agregar producto&quot; para comenzar.
+            {isAdmin
+              ? "Aún no hay productos. Escanea un código de barras o haz clic en “Agregar producto” para comenzar."
+              : "Aún no hay productos."}
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -194,13 +201,14 @@ export default function InventoryPage() {
                   {sortHeader("Producto", "name")}
                   {sortHeader("Código de barras", "barcode")}
                   {sortHeader("Categoría", "category")}
-                  {shop?.gstEnabled && (
+                  {isAdmin && shop?.gstEnabled && (
                     sortHeader("GST", "taxRate", true)
                   )}
-                  {sortHeader("Costo", "purchasePrice", true)}
+                  {isAdmin && sortHeader("Costo", "purchasePrice", true)}
                   {sortHeader("Precio", "sellingPrice", true)}
                   {sortHeader("Stock", "stock", true)}
-                  <th className="py-2" />
+                  {isAdmin && <th className="py-2" />}
+                  {!isAdmin && <th className="py-2 text-right">Etiquetas</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -209,13 +217,19 @@ export default function InventoryPage() {
                   return (
                     <tr key={product.id}>
                       <td className="py-2.5 pr-4">
-                        <button
-                          type="button"
-                          onClick={() => setModal({ mode: "edit", product })}
-                          className="font-medium text-foreground hover:text-brand hover:underline"
-                        >
-                          {product.name}
-                        </button>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setModal({ mode: "edit", product })}
+                            className="font-medium text-foreground hover:text-brand hover:underline"
+                          >
+                            {product.name}
+                          </button>
+                        ) : (
+                          <span className="font-medium text-foreground">
+                            {product.name}
+                          </span>
+                        )}
                         {product.sku && (
                           <span
                             className="ml-1.5 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"
@@ -231,14 +245,16 @@ export default function InventoryPage() {
                       <td className="py-2.5 pr-4 text-foreground/60">
                         {product.category || "—"}
                       </td>
-                      {shop?.gstEnabled && (
+                      {isAdmin && shop?.gstEnabled && (
                         <td className="py-2.5 pr-4 text-right text-foreground/60">
                           {product.taxRate}%
                         </td>
                       )}
-                      <td className="py-2.5 pr-4 text-right text-foreground/70">
-                        {money(product.purchasePrice)}
-                      </td>
+                      {isAdmin && (
+                        <td className="py-2.5 pr-4 text-right text-foreground/70">
+                          {money(product.purchasePrice ?? 0)}
+                        </td>
+                      )}
                       <td className="py-2.5 pr-4 text-right text-foreground/70">
                         {product.discountType && product.discountValue > 0 ? (
                           <>
@@ -254,18 +270,30 @@ export default function InventoryPage() {
                         )}
                       </td>
                       <td className="py-2.5 pr-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setStockTarget(product)}
-                          title="Ajustar stock"
-                          className={
-                            low
-                              ? "rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/20"
-                              : "rounded-full px-2.5 py-1 text-foreground/70 hover:bg-surface-muted"
-                          }
-                        >
-                          {product.stock}
-                        </button>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            onClick={() => setStockTarget(product)}
+                            title="Ajustar stock"
+                            className={
+                              low
+                                ? "rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/20"
+                                : "rounded-full px-2.5 py-1 text-foreground/70 hover:bg-surface-muted"
+                            }
+                          >
+                            {product.stock}
+                          </button>
+                        ) : (
+                          <span
+                            className={
+                              low
+                                ? "rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning"
+                                : "text-foreground/70"
+                            }
+                          >
+                            {product.stock}
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
@@ -281,7 +309,7 @@ export default function InventoryPage() {
                               aria-hidden="true"
                             />
                           </button>
-                          <button
+                          {isAdmin && <button
                             type="button"
                             aria-label={`Ajustar stock para ${product.name}`}
                             title="Ajustar stock"
@@ -292,8 +320,8 @@ export default function InventoryPage() {
                               className="h-5 w-5"
                               aria-hidden="true"
                             />
-                          </button>
-                          <button
+                          </button>}
+                          {isAdmin && <button
                             type="button"
                             aria-label={`Editar ${product.name}`}
                             title="Editar producto"
@@ -301,8 +329,8 @@ export default function InventoryPage() {
                             className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-muted text-foreground/70 transition-colors hover:border-brand/40 hover:bg-brand/10 hover:text-brand"
                           >
                             <Pencil className="h-5 w-5" aria-hidden="true" />
-                          </button>
-                          <button
+                          </button>}
+                          {isAdmin && <button
                             type="button"
                             aria-label={`Eliminar ${product.name}`}
                             title="Eliminar producto"
@@ -310,7 +338,7 @@ export default function InventoryPage() {
                             className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-surface-muted text-foreground/70 transition-colors hover:border-danger/40 hover:bg-danger/10 hover:text-danger"
                           >
                             <Trash2 className="h-5 w-5" aria-hidden="true" />
-                          </button>
+                          </button>}
                         </div>
                       </td>
                     </tr>

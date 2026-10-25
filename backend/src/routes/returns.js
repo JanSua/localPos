@@ -1,7 +1,7 @@
 const express = require('express');
 const { z } = require('zod');
 const prisma = require('../lib/prisma');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 const { round2 } = require('../lib/pricing');
 const { notifyStockChange } = require('../lib/webhooks');
 
@@ -28,7 +28,7 @@ const returnSchema = z.object({
 // due. "Already returned" is computed by summing prior ReturnItem rows for
 // each invoice item rather than a running counter, so the same unit can
 // never be returned twice even across multiple partial returns.
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   const parsed = returnSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Los datos de la devolución no son válidos.', details: parsed.error.flatten() });

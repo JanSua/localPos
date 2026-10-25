@@ -29,7 +29,13 @@ const SHORTCUTS = [
 // `{searchOpen && <GlobalSearch ... />}`) rather than keeping it always
 // mounted and toggling an `open` prop — a fresh mount starts from a clean
 // query with no reset-on-open effect needed.
-export function GlobalSearch({ onClose, sym }: { onClose: () => void; sym: string }) {
+export function GlobalSearch({
+  onClose,
+  sym,
+}: {
+  onClose: () => void;
+  sym: string;
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
@@ -54,7 +60,9 @@ export function GlobalSearch({ onClose, sym }: { onClose: () => void; sym: strin
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  const shortcuts = SHORTCUTS.filter((s) => s.label.toLowerCase().includes(query.trim().toLowerCase()));
+  const shortcuts = SHORTCUTS.filter((s) =>
+    s.label.toLowerCase().includes(query.trim().toLowerCase()),
+  );
 
   return (
     <div
