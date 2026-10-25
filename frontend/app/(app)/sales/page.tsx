@@ -76,10 +76,10 @@ export default function SalesPage() {
                       {new Date(inv.createdAt).toLocaleString()}
                     </td>
                     <td className="py-2.5 pr-4 text-foreground/70">
-                      {inv.customerName}
+                      {displayCustomerName(inv.customerName)}
                     </td>
                     <td className="py-2.5 pr-4 text-foreground/70">
-                      {inv.paymentMethod}
+                      {paymentMethodLabel(inv.paymentMethod)}
                     </td>
                     <td className="py-2.5 text-right font-medium text-foreground">
                       {formatMoney(inv.totalAmount, sym)}
@@ -173,7 +173,6 @@ function InvoiceDrawer({
       );
     }
   }
-
   return (
     <div
       className="fixed inset-0 z-40 flex justify-end bg-black/50"
@@ -261,7 +260,7 @@ function InvoiceDrawer({
                 <span>{money(invoice.totalAmount)}</span>
               </div>
               <Line
-                label={`Pagado (${invoice.paymentMethod})`}
+                label={`Pagado (${paymentMethodLabel(invoice.paymentMethod)})`}
                 value={money(invoice.amountPaid)}
               />
               {invoice.changeDue > 0 && (
@@ -297,6 +296,7 @@ function InvoiceDrawer({
                       </div>
                     );
                   }
+
                   return (
                     <div
                       key={it.id}
@@ -405,6 +405,19 @@ function InvoiceDrawer({
       </div>
     </div>
   );
+}
+
+function paymentMethodLabel(method: "CASH" | "UPI" | "TRANSFER" | "CARD") {
+  return {
+    CASH: "Efectivo",
+    UPI: "UPI",
+    TRANSFER: "Transferencia",
+    CARD: "Tarjeta",
+  }[method];
+}
+
+function displayCustomerName(name: string) {
+  return !name || name === "Walk-in Customer" ? "Cliente ocasional" : name;
 }
 
 function Line({ label, value }: { label: string; value: string }) {

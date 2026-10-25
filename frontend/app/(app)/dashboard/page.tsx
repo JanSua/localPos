@@ -6,7 +6,6 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Award,
-  CircleDollarSign,
   Download,
   Package,
   Receipt,
@@ -24,8 +23,6 @@ import {
   useSalesSummary,
 } from "@/hooks/useInvoices";
 import {
-  useDueSummary,
-  useTopDueCustomers,
   useTopLoyaltyCustomers,
 } from "@/hooks/useCustomers";
 import { useShopSettings } from "@/hooks/useShopSettings";
@@ -39,8 +36,6 @@ export default function DashboardPage() {
   const { data: invoices } = useInvoices();
   const { data: analytics } = useSalesAnalytics();
   const { data: topCustomers } = useTopLoyaltyCustomers(10);
-  const { data: dueSummary } = useDueSummary();
-  const { data: topDueCustomers } = useTopDueCustomers(8);
 
   const sym = shop?.currencySymbol || "Rs.";
   const money = (n: number) => formatMoney(n, sym);
@@ -76,7 +71,7 @@ export default function DashboardPage() {
         </a>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           icon={Receipt}
           label="Ventas de hoy"
@@ -86,7 +81,7 @@ export default function DashboardPage() {
         />
         <StatCard
           icon={TrendingUp}
-          label="Ingresos de hoy"
+          label="Total vendido hoy"
           value={money(summary?.todaysRevenue ?? 0)}
           delta={revenueDelta}
           sparkline={trend.map((t) => t.revenue)}
@@ -101,12 +96,6 @@ export default function DashboardPage() {
           label="Artículos con stock bajo"
           value={`${lowStock?.products.length ?? 0}`}
           accent={lowStock?.products.length ? "warning" : undefined}
-        />
-        <StatCard
-          icon={CircleDollarSign}
-          label="Total adeudado"
-          value={money(dueSummary?.totalDue ?? 0)}
-          accent={dueSummary?.totalDue ? "danger" : undefined}
         />
       </div>
 
@@ -131,7 +120,7 @@ export default function DashboardPage() {
 
       <SalesCharts sym={sym} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-base font-semibold text-foreground">
@@ -219,45 +208,6 @@ export default function DashboardPage() {
           )}
         </Card>
 
-        <Card className="p-5">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-foreground">
-              Compradores con deuda
-            </h2>
-            <Link
-              href="/customers"
-              className="text-sm font-medium text-brand hover:underline"
-            >
-              Ver Todos
-            </Link>
-          </div>
-          {!topDueCustomers || topDueCustomers.length === 0 ? (
-            <p className="py-6 text-center text-sm text-foreground/50">
-              No hay deudas pendientes en este momento.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {topDueCustomers.map((customer) => (
-                <li
-                  key={customer.id}
-                  className="flex items-center justify-between py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">
-                      {customer.name}
-                    </p>
-                    <p className="text-xs text-foreground/50">
-                      {customer.phone}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-danger-soft px-3 py-1 text-xs font-semibold text-danger">
-                    {money(customer.totalDue)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
       </div>
 
       <Card className="p-5">

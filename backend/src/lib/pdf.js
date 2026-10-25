@@ -102,6 +102,7 @@ function buildReceiptPdf({ shop, invoice }) {
     const paymentMethod = {
       CASH: 'Efectivo',
       UPI: 'UPI',
+      TRANSFER: 'Transferencia',
       CARD: 'Tarjeta',
     }[invoice.paymentMethod] || invoice.paymentMethod;
 

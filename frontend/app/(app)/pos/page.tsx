@@ -65,6 +65,10 @@ export default function PosPage() {
     totalAmount: number;
   } | null>(null);
   const [cameraScannerOpen, setCameraScannerOpen] = useState(false);
+  const [manualSearchFocused, setManualSearchFocused] = useState(false);
+  const [customerPanelOpen, setCustomerPanelOpen] = useState(false);
+  const [returnPanelOpen, setReturnPanelOpen] = useState(false);
+  const [discountPanelOpen, setDiscountPanelOpen] = useState(false);
 
   // Manual add — the fallback for when the barcode scanner isn't working: type
   // a product name or barcode and pick from the matches. Debounced so we don't
@@ -77,6 +81,13 @@ export default function PosPage() {
     return () => clearTimeout(t);
   }, [manualQuery]);
   const { data: manualResults } = useProducts(committedQuery);
+  const manualOptions = useMemo(() => {
+    if (!manualResults) return undefined;
+    if (committedQuery) return manualResults.slice(0, 8);
+    return [...manualResults].sort((a, b) =>
+      a.name.localeCompare(b.name, "es", { sensitivity: "base" }),
+    );
+  }, [committedQuery, manualResults]);
 
   const sym = shop?.currencySymbol || "Rs.";
   const money = (n: number) => formatMoney(n, sym);
@@ -232,6 +243,9 @@ export default function PosPage() {
     setPointsRedeemed(0);
     setPaymentMethod("CASH");
     setAmountPaid("");
+    setCustomerPanelOpen(false);
+    setReturnPanelOpen(false);
+    setDiscountPanelOpen(false);
   };
 
   // A bill is submittable if it sells something, returns something, or
@@ -477,6 +491,8 @@ export default function PosPage() {
                 type="text"
                 value={manualQuery}
                 onChange={(e) => setManualQuery(e.target.value)}
+                onFocus={() => setManualSearchFocused(true)}
+                onBlur={() => setManualSearchFocused(false)}
                 placeholder="¿Escáner no funciona? Escribe un nombre de producto o código de barras para agregar…"
                 aria-label="Agregar producto manualmente"
                 className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/40"
@@ -492,18 +508,20 @@ export default function PosPage() {
                 </button>
               )}
             </div>
-            {committedQuery && (
+            {(manualSearchFocused || manualQuery.trim()) && (
               <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-surface shadow-lg">
-                {!manualResults ? (
+                {manualQuery.trim() !== committedQuery || !manualOptions ? (
                   <p className="px-3 py-2.5 text-sm text-foreground/50">
                     Buscando…
                   </p>
-                ) : manualResults.length === 0 ? (
+                ) : manualOptions.length === 0 ? (
                   <p className="px-3 py-2.5 text-sm text-foreground/50">
-                    Ningún producto coincide con &ldquo;{committedQuery}&rdquo;.
+                    {committedQuery
+                      ? `Ningún producto coincide con “${committedQuery}”.`
+                      : "No hay productos en el inventario."}
                   </p>
                 ) : (
-                  manualResults.slice(0, 8).map((p) => {
+                  manualOptions.map((p) => {
                     const outOfStock =
                       p.stock <= 0 && !shop?.allowNegativeStock;
                     return (
@@ -511,6 +529,7 @@ export default function PosPage() {
                         key={p.id}
                         type="button"
                         disabled={outOfStock}
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           addToCart(p);
                           setManualQuery("");
@@ -635,9 +654,31 @@ export default function PosPage() {
         {/* Checkout panel */}
         <div className="flex flex-col gap-4">
           {/* Customer */}
-          <Card className="flex flex-col gap-3 p-5">
-            <h2 className="text-base font-semibold text-foreground">Cliente</h2>
-            <div className="flex items-end gap-2">
+          <Card className="p-5">
+            <details
+              open={customerPanelOpen}
+              onToggle={(e) => setCustomerPanelOpen(e.currentTarget.open)}
+            >
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-foreground">
+                    Cliente (opcional)
+                  </h2>
+                  <span className="text-xs font-normal text-foreground/50">
+                    si aplica
+                  </span>
+                  {customer && (
+                    <span className="ml-auto truncate text-xs text-foreground/60">
+                      {customer.name}
+                    </span>
+                  )}
+                  <span aria-hidden="true" className="text-foreground/50">
+                    ▾
+                  </span>
+                </div>
+              </summary>
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex items-end gap-2">
               <div className="flex-1">
                 <Field
                   label="Teléfono"
@@ -658,8 +699,8 @@ export default function PosPage() {
               >
                 <Search className="h-4 w-4" aria-hidden="true" />
               </Button>
-            </div>
-            <Field
+                </div>
+                <Field
               label="Nombre (opcional)"
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
@@ -765,14 +806,31 @@ export default function PosPage() {
                 )}
               </div>
             )}
+              </div>
+            </details>
           </Card>
 
           {/* Returns / exchange */}
-          <Card className="flex flex-col gap-3 p-5">
-            <h2 className="text-base font-semibold text-foreground">
-              Devolución / Cambio
-            </h2>
-            <ReturnPanel
+          <Card className="p-5">
+            <details
+              open={returnPanelOpen}
+              onToggle={(e) => setReturnPanelOpen(e.currentTarget.open)}
+            >
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-foreground">
+                    Devolución / Cambio
+                  </h2>
+                  <span className="text-xs font-normal text-foreground/50">
+                    si aplica
+                  </span>
+                  <span aria-hidden="true" className="ml-auto text-foreground/50">
+                    ▾
+                  </span>
+                </div>
+              </summary>
+              <div className="mt-3 flex flex-col gap-3">
+                <ReturnPanel
               sym={sym}
               drafted={returnLines}
               onAdd={(lines) => setReturnLines((prev) => [...prev, ...lines])}
@@ -862,13 +920,30 @@ export default function PosPage() {
                 </div>
               </div>
             )}
+              </div>
+            </details>
           </Card>
 
-          {/* Discount + payment */}
-          <Card className="flex flex-col gap-3 p-5">
-            <h2 className="text-base font-semibold text-foreground">
-              Descuento
-            </h2>
+          {/* Discount */}
+          <Card className="p-5">
+            <details
+              open={discountPanelOpen}
+              onToggle={(e) => setDiscountPanelOpen(e.currentTarget.open)}
+            >
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-semibold text-foreground">
+                    Descuento
+                  </h2>
+                  <span className="text-xs font-normal text-foreground/50">
+                    si aplica
+                  </span>
+                  <span aria-hidden="true" className="ml-auto text-foreground/50">
+                    ▾
+                  </span>
+                </div>
+              </summary>
+              <div className="mt-3 flex flex-col gap-3">
             <div className="flex gap-2">
               <select
                 aria-label="Tipo de descuento"
@@ -908,54 +983,8 @@ export default function PosPage() {
                 />
               )}
             </div>
-
-            <h2 className="mt-2 text-base font-semibold text-foreground">
-              Pago
-            </h2>
-            <div className="grid grid-cols-3 gap-2">
-              {(["CASH", "UPI", "CARD"] as PaymentMethod[]).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setPaymentMethod(m)}
-                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    paymentMethod === m
-                      ? "border-brand bg-brand text-brand-foreground"
-                      : "border-border text-foreground/70 hover:bg-surface-muted"
-                  }`}
-                >
-                  {m === "CASH"
-                    ? "Efectivo"
-                    : m === "UPI"
-                      ? "UPI"
-                      : m === "CARD"
-                        ? "Tarjeta"
-                        : m}
-                </button>
-              ))}
-            </div>
-            {paymentMethod === "CASH" && (
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <MoneyField
-                    label="Monto recibido"
-                    value={amountPaid}
-                    onChange={(value) =>
-                      setAmountPaid(value === null ? "" : String(value))
-                    }
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="whitespace-nowrap"
-                  onClick={() => setAmountPaid(String(collectTotal))}
-                  disabled={collectTotal === 0}
-                >
-                  Pagado completo
-                </Button>
               </div>
-            )}
+            </details>
           </Card>
 
           {/* Totals */}
@@ -1057,6 +1086,51 @@ export default function PosPage() {
               <p className="text-xs text-foreground/50">
                 Gana {quote.pointsEarned} puntos
               </p>
+            )}
+            <h2 className="mt-2 text-base font-semibold text-foreground">
+              Pago
+            </h2>
+            <div className="grid grid-cols-3 gap-2">
+              {(["CASH", "TRANSFER", "CARD"] as PaymentMethod[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setPaymentMethod(m)}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    paymentMethod === m
+                      ? "border-brand bg-brand text-brand-foreground"
+                      : "border-border text-foreground/70 hover:bg-surface-muted"
+                  }`}
+                >
+                  {m === "CASH"
+                    ? "Efectivo"
+                    : m === "TRANSFER"
+                      ? "Transferencia"
+                      : "Tarjeta"}
+                </button>
+              ))}
+            </div>
+            {paymentMethod === "CASH" && (
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <MoneyField
+                    label="Monto recibido"
+                    value={amountPaid}
+                    onChange={(value) =>
+                      setAmountPaid(value === null ? "" : String(value))
+                    }
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="whitespace-nowrap"
+                  onClick={() => setAmountPaid(String(collectTotal))}
+                  disabled={collectTotal === 0}
+                >
+                  Pagado completo
+                </Button>
+              </div>
             )}
             <Button
               onClick={finalizeSale}

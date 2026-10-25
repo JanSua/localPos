@@ -24,6 +24,7 @@ import { formatMoney } from "@/lib/format";
 const PAYMENT_COLORS: Record<string, string> = {
   CASH: "var(--color-warning)",
   UPI: "var(--color-success)",
+  TRANSFER: "var(--color-success)",
   CARD: "var(--color-brand)",
 };
 const FALLBACK_COLORS = [
@@ -34,6 +35,7 @@ const FALLBACK_COLORS = [
 const PAYMENT_LABELS: Record<string, string> = {
   CASH: "Efectivo",
   UPI: "UPI",
+  TRANSFER: "Transferencia",
   CARD: "Tarjeta",
 };
 
@@ -65,7 +67,7 @@ function RevenueTooltip({
         <span className="font-medium text-foreground">{point.count}</span>
       </div>
       <div className="flex items-center justify-between gap-6">
-        <span className="text-foreground-muted">Ingresos totales</span>
+        <span className="text-foreground-muted">Total vendido</span>
         <span className="font-medium text-foreground">
           {money(point.revenue)}
         </span>
@@ -91,7 +93,7 @@ export function SalesCharts({ sym }: { sym: string }) {
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card className="p-5 lg:col-span-2">
         <h2 className="mb-4 text-base font-semibold text-foreground">
-          Ingresos — últimos 14 días
+          Total vendido — últimos 14 días
         </h2>
         {isLoading ? (
           <p className="py-16 text-center text-sm text-foreground-muted">

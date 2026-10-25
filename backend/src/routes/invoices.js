@@ -23,7 +23,7 @@ const checkoutSchema = z
     discountType: z.enum(['percent', 'amount']).nullish(),
     discountValue: z.number().min(0).default(0),
     pointsRedeemed: z.number().int().min(0).default(0),
-    paymentMethod: z.enum(['CASH', 'UPI', 'CARD']).default('CASH'),
+    paymentMethod: z.enum(['CASH', 'UPI', 'TRANSFER', 'CARD']).default('CASH'),
     amountPaid: z.number().min(0).default(0),
     // Old outstanding due the customer chooses to clear as part of this bill.
     // Added on top of the goods total for what the cashier collects.

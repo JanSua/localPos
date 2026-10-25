@@ -15,7 +15,6 @@ import {
   Menu,
   X,
   Search,
-  Bell,
   ChevronDown,
   CalendarRange,
 } from "lucide-react";
@@ -23,7 +22,6 @@ import { clsx } from "clsx";
 import { api } from "@/lib/api";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { useMe } from "@/hooks/useAuth";
-import { useLowStock } from "@/hooks/useProducts";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -46,7 +44,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { data: shop } = useShopSettings();
   const { data: me } = useMe();
-  const { data: lowStock } = useLowStock();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -244,17 +241,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
               Últimos 14 días
             </span>
-
-            <Link
-              href="/inventory"
-              aria-label={`${lowStock?.products.length ?? 0} alertas de stock bajo`}
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-foreground-muted transition-colors hover:bg-surface-muted hover:text-foreground"
-            >
-              <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
-              {!!lowStock?.products.length && (
-                <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-brand shadow-[0_0_6px_var(--brand-glow)]" />
-              )}
-            </Link>
 
             <ThemeToggle />
 

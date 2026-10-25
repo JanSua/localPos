@@ -117,7 +117,7 @@ export interface Invoice {
   taxAmount: number;
   loyaltyDiscount: number;
   totalAmount: number;
-  paymentMethod: "CASH" | "UPI" | "CARD";
+  paymentMethod: "CASH" | "UPI" | "TRANSFER" | "CARD";
   amountPaid: number;
   changeDue: number;
   dueAmount: number;
@@ -137,7 +137,7 @@ export interface CartItem {
   quantity: number;
 }
 
-export type PaymentMethod = "CASH" | "UPI" | "CARD";
+export type PaymentMethod = "CASH" | "UPI" | "TRANSFER" | "CARD";
 
 export type RefundMethod = "CASH" | "UPI" | "CARD" | "DUE_ADJUST";
 
