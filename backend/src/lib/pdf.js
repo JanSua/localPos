@@ -3,9 +3,10 @@
 // Used for the "Download PDF" button; the same data also feeds the printable
 // HTML view (see receipt.js) that drives the browser print dialog.
 const PDFDocument = require('pdfkit');
+const { formatAmount } = require('./currency');
 
 function money(sym, n) {
-  return `${sym} ${Number(n).toFixed(2)}`;
+  return `${sym} ${formatAmount(n)}`;
 }
 
 // A drawn horizontal rule spanning the content width. Earlier this used
@@ -31,16 +32,16 @@ function rule(doc, { dashed = false } = {}) {
 // wrapped line spilling onto an otherwise-blank second page is exactly the
 // waste this is meant to prevent, so wrapping text (long item names, a
 // multi-line custom footer) is measured properly rather than flat-rated.
-const CHARS_PER_LINE_NAME = 12; // ~colName width (0.28 * ~195pt) at 8pt Helvetica
-const CHARS_PER_LINE_FULL = 30; // full receipt width at 8pt Helvetica, centered text
-
 function wrappedLines(text, charsPerLine) {
   return String(text)
     .split('\n')
     .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0);
 }
 
-function estimateHeight({ shop, invoice }) {
+function estimateHeight({ shop, invoice, contentWidth }) {
+  const widthScale = contentWidth / 195;
+  const charsPerLineName = Math.max(1, Math.floor(12 * widthScale));
+  const charsPerLineFull = Math.max(1, Math.floor(30 * widthScale));
   let h = 40; // top/bottom margins + rounding buffer
   h += 16; // shop name
   if (shop.legalName) h += 10;
@@ -53,7 +54,7 @@ function estimateHeight({ shop, invoice }) {
   h += 8; // rule
   h += 20; // table header row
   for (const it of invoice.items) {
-    h += wrappedLines(it.name, CHARS_PER_LINE_NAME) * 10 + 4;
+    h += wrappedLines(it.name, charsPerLineName) * 10 + 4;
     if (shop.gstEnabled && shop.showGst && it.taxRate > 0) h += 9;
   }
   h += 8; // rule
@@ -75,14 +76,18 @@ function estimateHeight({ shop, invoice }) {
   }
   if (shop.loyaltyEnabled && invoice.pointsEarned > 0) h += 14;
   h += 12 + 8; // spacer + rule
-  h += wrappedLines(shop.receiptFooter || 'Thank You! Visit Again.', CHARS_PER_LINE_FULL) * 10;
+  h += wrappedLines(shop.receiptFooter || 'Gracias por su compra. ¡Vuelva pronto!', charsPerLineFull) * 10;
   return Math.max(300, Math.ceil(h) + 40);
 }
 
 function buildReceiptPdf({ shop, invoice }) {
   return new Promise((resolve, reject) => {
-    const height = estimateHeight({ shop, invoice });
-    const doc = new PDFDocument({ size: [227, height], margin: 16 }); // ~80mm wide, height fit to this receipt
+    const paperWidth = shop.usbPrinterWidth === 80 ? 80 : 58;
+    const pageWidth = (paperWidth * 72) / 25.4;
+    const margin = paperWidth === 58 ? 10 : 16;
+    const contentWidth = pageWidth - margin * 2;
+    const height = estimateHeight({ shop, invoice, contentWidth });
+    const doc = new PDFDocument({ size: [pageWidth, height], margin });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -90,6 +95,15 @@ function buildReceiptPdf({ shop, invoice }) {
 
     const sym = shop.currencySymbol || 'Rs.';
     const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const customerName =
+      !invoice.customerName || invoice.customerName === 'Walk-in Customer'
+        ? 'Cliente ocasional'
+        : invoice.customerName;
+    const paymentMethod = {
+      CASH: 'Efectivo',
+      UPI: 'UPI',
+      CARD: 'Tarjeta',
+    }[invoice.paymentMethod] || invoice.paymentMethod;
 
     doc.font('Helvetica-Bold').fontSize(13).text(shop.shopName, { align: 'center' });
     doc.font('Helvetica').fontSize(8);
@@ -98,19 +112,19 @@ function buildReceiptPdf({ shop, invoice }) {
     if (addr) doc.text(addr, { align: 'center' });
     const cityState = [shop.city, shop.state].filter(Boolean).join(', ');
     if (cityState) doc.text(cityState, { align: 'center' });
-    if (shop.phone) doc.text(`Ph: ${shop.phone}`, { align: 'center' });
+    if (shop.phone) doc.text(`Teléfono: ${shop.phone}`, { align: 'center' });
     if (shop.gstEnabled && shop.gstNumber) doc.text(`GSTIN: ${shop.gstNumber}`, { align: 'center' });
 
     doc.moveDown(0.5);
     rule(doc, { dashed: true });
     const date = new Date(invoice.createdAt || Date.now());
-    doc.text(`${date.toLocaleString()}`);
-    doc.text(`Bill: #${invoice.invoiceNumber}`);
-    doc.text(`Cust: ${invoice.customerName || 'Walk-in Customer'}${invoice.customerPhone ? ` · ${invoice.customerPhone}` : ''}`);
+    doc.text(date.toLocaleString('es-CO'));
+    doc.text(`Factura: #${invoice.invoiceNumber}`);
+    doc.text(`Cliente: ${customerName}${invoice.customerPhone ? ` · ${invoice.customerPhone}` : ''}`);
     rule(doc, { dashed: true });
 
     const colName = width * 0.28;
-    const colQty = width * 0.22; // wide enough for "<qty> <unit>", e.g. "3 KGS"
+    const colQty = width * 0.22;
     const colRate = width * 0.25;
     const colAmt = width * 0.25;
     // Right-aligned columns sit flush against each other's shared boundary,
@@ -120,10 +134,10 @@ function buildReceiptPdf({ shop, invoice }) {
     const GAP = 4;
     let y = doc.y;
     doc.font('Helvetica-Bold').fontSize(7.5);
-    doc.text('Item', doc.page.margins.left, y, { width: colName });
-    doc.text('Qty', doc.page.margins.left + colName, y, { width: colQty - GAP, align: 'right' });
-    doc.text('Rate', doc.page.margins.left + colName + colQty, y, { width: colRate - GAP, align: 'right' });
-    doc.text('Amount', doc.page.margins.left + colName + colQty + colRate, y, { width: colAmt, align: 'right' });
+    doc.text('Artículo', doc.page.margins.left, y, { width: colName });
+    doc.text('Cant.', doc.page.margins.left + colName, y, { width: colQty - GAP, align: 'right' });
+    doc.text('Precio', doc.page.margins.left + colName + colQty, y, { width: colRate - GAP, align: 'right' });
+    doc.text('Importe', doc.page.margins.left + colName + colQty + colRate, y, { width: colAmt, align: 'right' });
     doc.moveDown(0.3);
     doc.font('Helvetica').fontSize(8);
     rule(doc, { dashed: true });
@@ -133,7 +147,7 @@ function buildReceiptPdf({ shop, invoice }) {
       const base = it.price * it.quantity;
       doc.text(it.name, doc.page.margins.left, y, { width: colName });
       const rowHeight = doc.heightOfString(it.name, { width: colName });
-      doc.text(it.unit ? `${it.quantity} ${it.unit}` : String(it.quantity), doc.page.margins.left + colName, y, {
+      doc.text(String(it.quantity), doc.page.margins.left + colName, y, {
         width: colQty - GAP,
         align: 'right',
       });
@@ -141,7 +155,7 @@ function buildReceiptPdf({ shop, invoice }) {
       doc.text(money(sym, base), doc.page.margins.left + colName + colQty + colRate, y, { width: colAmt, align: 'right' });
       doc.y = y + Math.max(rowHeight, 11);
       if (shop.gstEnabled && shop.showGst && it.taxRate > 0) {
-        doc.fontSize(6.5).fillColor('#666').text(`  GST @ ${it.taxRate}%`);
+        doc.fontSize(6.5).fillColor('#666').text(`  Impuesto @ ${it.taxRate}%`);
         doc.fontSize(8).fillColor('#000');
       }
     }
@@ -158,21 +172,21 @@ function buildReceiptPdf({ shop, invoice }) {
 
     totalLine('Subtotal', money(sym, invoice.subtotal));
     if (invoice.discountAmount > 0) {
-      const label = invoice.discountType === 'percent' ? `Discount (${invoice.discountValue}%)` : 'Discount';
+      const label = invoice.discountType === 'percent' ? `Descuento (${invoice.discountValue}%)` : 'Descuento';
       totalLine(label, `- ${money(sym, invoice.discountAmount)}`);
     }
     if (shop.gstEnabled && invoice.taxAmount > 0) {
       // Prices are MRP — GST-inclusive by law — so this is a breakup of
       // tax already inside the total, not an addition to it.
       const half = Math.round((invoice.taxAmount / 2 + Number.EPSILON) * 100) / 100;
-      totalLine('CGST (incl.)', money(sym, half));
-      totalLine('SGST (incl.)', money(sym, invoice.taxAmount - half));
+      totalLine('Impuesto incluido (1/2)', money(sym, half));
+      totalLine('Impuesto incluido (2/2)', money(sym, invoice.taxAmount - half));
     }
     if (invoice.loyaltyDiscount > 0) {
-      totalLine(`Loyalty (${invoice.pointsRedeemed} pts)`, `- ${money(sym, invoice.loyaltyDiscount)}`);
+      totalLine(`Descuento por puntos (${invoice.pointsRedeemed})`, `- ${money(sym, invoice.loyaltyDiscount)}`);
     }
-    if (invoice.returnValue > 0) totalLine('Returns', `- ${money(sym, invoice.returnValue)}`);
-    if (invoice.creditApplied > 0) totalLine('Store credit used', `- ${money(sym, invoice.creditApplied)}`);
+    if (invoice.returnValue > 0) totalLine('Devoluciones', `- ${money(sym, invoice.returnValue)}`);
+    if (invoice.creditApplied > 0) totalLine('Crédito en tienda usado', `- ${money(sym, invoice.creditApplied)}`);
 
     const payable = Math.max(0, Math.round((invoice.totalAmount - invoice.returnValue - invoice.creditApplied) * 100) / 100);
     const hasRefund = invoice.refundValue > 0;
@@ -180,32 +194,32 @@ function buildReceiptPdf({ shop, invoice }) {
     // an old due went before the final refund line, or the receipt reads as
     // "Returns -500 / REFUND 200" with 300 unaccounted for.
     if (hasRefund && invoice.previousDuePaid > 0) {
-      totalLine('Old Due Cleared', `- ${money(sym, invoice.previousDuePaid)}`);
+      totalLine('Abono de deuda anterior', `- ${money(sym, invoice.previousDuePaid)}`);
     }
     rule(doc);
     if (hasRefund) {
-      totalLine(`REFUND (${invoice.refundMode === 'CREDIT' ? 'store credit' : 'cash'})`, money(sym, invoice.refundValue), true);
+      totalLine(`DEVOLUCIÓN (${invoice.refundMode === 'CREDIT' ? 'crédito en tienda' : 'efectivo'})`, money(sym, invoice.refundValue), true);
     } else {
-      const grandLabel = invoice.returnValue > 0 || invoice.creditApplied > 0 ? 'NET PAYABLE' : 'GRAND TOTAL';
+      const grandLabel = invoice.returnValue > 0 || invoice.creditApplied > 0 ? 'TOTAL NETO' : 'TOTAL';
       totalLine(grandLabel, money(sym, payable), true);
       rule(doc);
-      totalLine(`Paid (${invoice.paymentMethod})`, money(sym, invoice.amountPaid));
+      totalLine(`Pagado (${paymentMethod})`, money(sym, invoice.amountPaid));
       if (invoice.previousDuePaid > 0) {
-        totalLine('Old Due Cleared', money(sym, invoice.previousDuePaid));
-        totalLine('Total Collected', money(sym, invoice.amountPaid + invoice.previousDuePaid), true);
+        totalLine('Abono de deuda anterior', money(sym, invoice.previousDuePaid));
+        totalLine('Total recibido', money(sym, invoice.amountPaid + invoice.previousDuePaid), true);
       }
-      if (invoice.changeDue > 0) totalLine('Change', money(sym, invoice.changeDue));
-      if (invoice.dueAmount > 0) totalLine('Balance Due', money(sym, invoice.dueAmount));
+      if (invoice.changeDue > 0) totalLine('Cambio', money(sym, invoice.changeDue));
+      if (invoice.dueAmount > 0) totalLine('Saldo pendiente', money(sym, invoice.dueAmount));
     }
 
     if (shop.loyaltyEnabled && invoice.pointsEarned > 0) {
       doc.moveDown(0.3);
-      doc.fontSize(8).text(`You earned ${invoice.pointsEarned} loyalty points!`, { align: 'center' });
+      doc.fontSize(8).text(`Ganaste ${invoice.pointsEarned} puntos de lealtad`, { align: 'center' });
     }
 
     doc.moveDown(0.5);
     rule(doc, { dashed: true });
-    doc.fontSize(8).text(shop.receiptFooter || 'Thank You! Visit Again.', { align: 'center' });
+    doc.fontSize(8).text(shop.receiptFooter || 'Gracias por su compra. ¡Vuelva pronto!', { align: 'center' });
 
     doc.end();
   });

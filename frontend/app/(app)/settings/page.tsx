@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
+import { MoneyField } from "@/components/ui/MoneyField";
 import { Select } from "@/components/ui/Select";
 import { Toggle } from "@/components/ui/Toggle";
 import { Button } from "@/components/ui/Button";
@@ -289,7 +290,10 @@ function CompanyTab({ settings }: { settings: ShopSettings }) {
 
 function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
   const save = useSaver();
-  const [form, setForm] = useState(settings);
+  const [form, setForm] = useState({
+    ...settings,
+    pointValue: Math.round(settings.pointValue),
+  });
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
@@ -413,14 +417,11 @@ function TaxLoyaltyTab({ settings }: { settings: ShopSettings }) {
                   }))
                 }
               />
-              <Field
+              <MoneyField
                 label="Valor de 1 punto (en moneda)"
-                type="number"
-                min={0}
-                step="0.01"
                 value={form.pointValue}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, pointValue: Number(e.target.value) }))
+                onChange={(value) =>
+                  setForm((f) => ({ ...f, pointValue: value ?? 0 }))
                 }
               />
             </div>
@@ -448,6 +449,9 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
   const [header, setHeader] = useState(settings.receiptHeader ?? "");
   const [footer, setFooter] = useState(settings.receiptFooter ?? "");
   const [autoPrint, setAutoPrint] = useState(settings.autoPrintReceipt);
+  const [paperWidth, setPaperWidth] = useState<58 | 80>(
+    settings.usbPrinterWidth === 80 ? 80 : 58,
+  );
 
   return (
     <Card className="max-w-2xl p-6">
@@ -458,6 +462,7 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
             receiptHeader: header,
             receiptFooter: footer,
             autoPrintReceipt: autoPrint,
+            usbPrinterWidth: paperWidth,
           });
         }}
         className="flex flex-col gap-4"
@@ -467,6 +472,15 @@ function ReceiptTab({ settings }: { settings: ShopSettings }) {
           description="Abre el diálogo de impresión del navegador al completar cada venta para que elijas la impresora configurada en este equipo."
           checked={autoPrint}
           onChange={setAutoPrint}
+        />
+        <Select
+          label="Ancho del papel del recibo"
+          value={String(paperWidth)}
+          onChange={(e) => setPaperWidth(e.target.value === "80" ? 80 : 58)}
+          options={[
+            { value: "58", label: "58 mm (compacto)" },
+            { value: "80", label: "80 mm (estándar)" },
+          ]}
         />
         <div className="flex flex-col gap-1.5">
           <label htmlFor="rh" className="text-sm font-medium text-foreground">

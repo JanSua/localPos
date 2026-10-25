@@ -153,11 +153,6 @@ export default function InventoryPage() {
                         >
                           {product.name}
                         </button>
-                        {product.unit && (
-                          <span className="ml-1.5 text-xs text-foreground/40">
-                            ({product.unit})
-                          </span>
-                        )}
                         {product.sku && (
                           <span
                             className="ml-1.5 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-medium text-brand"

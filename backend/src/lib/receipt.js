@@ -11,11 +11,23 @@ function esc(s) {
 // calls window.print() on load — the browser's own print dialog lets the
 // user pick any printer (thermal, laser, PDF virtual printer, whatever the
 // OS/CUPS has configured) instead of us talking to a USB device directly.
+const { formatAmount } = require('./currency');
+
 function buildReceiptHtml({ shop, invoice }) {
+  const paperWidth = shop.usbPrinterWidth === 80 ? 80 : 58;
   const sym = shop.currencySymbol || 'Rs.';
-  const money = (n) => `${sym} ${Number(n).toFixed(2)}`;
+  const money = (n) => `${sym} ${formatAmount(n)}`;
   const date = new Date(invoice.createdAt || Date.now());
-  const dateStr = date.toLocaleString();
+  const dateStr = date.toLocaleString('es-CO');
+  const customerName =
+    !invoice.customerName || invoice.customerName === 'Walk-in Customer'
+      ? 'Cliente ocasional'
+      : invoice.customerName;
+  const paymentMethod = {
+    CASH: 'Efectivo',
+    UPI: 'UPI',
+    CARD: 'Tarjeta',
+  }[invoice.paymentMethod] || invoice.paymentMethod;
 
   const itemRows = invoice.items
     .map(
@@ -23,10 +35,10 @@ function buildReceiptHtml({ shop, invoice }) {
         <tr>
           <td>${esc(it.name)}${
             shop.gstEnabled && shop.showGst && it.taxRate > 0
-              ? `<div class="sub">GST @ ${it.taxRate}%</div>`
+              ? `<div class="sub">Impuesto @ ${it.taxRate}%</div>`
               : ''
           }</td>
-          <td class="num">${it.quantity}${it.unit ? ` ${esc(it.unit)}` : ''}</td>
+          <td class="num">${it.quantity}</td>
           <td class="num">${money(it.price)}</td>
           <td class="num">${money(it.price * it.quantity)}</td>
         </tr>`
@@ -36,7 +48,7 @@ function buildReceiptHtml({ shop, invoice }) {
   const totalRows = [];
   totalRows.push(['Subtotal', money(invoice.subtotal)]);
   if (invoice.discountAmount > 0) {
-    const label = invoice.discountType === 'percent' ? `Discount (${invoice.discountValue}%)` : 'Discount';
+    const label = invoice.discountType === 'percent' ? `Descuento (${invoice.discountValue}%)` : 'Descuento';
     totalRows.push([label, `- ${money(invoice.discountAmount)}`]);
   }
   if (shop.gstEnabled && invoice.taxAmount > 0) {
@@ -44,14 +56,14 @@ function buildReceiptHtml({ shop, invoice }) {
     // tax already inside the total above, not additional charges. Labelled
     // "(incl.)" so the receipt doesn't read as if they should be added.
     const half = Math.round((invoice.taxAmount / 2 + Number.EPSILON) * 100) / 100;
-    totalRows.push(['CGST (incl.)', money(half)]);
-    totalRows.push(['SGST (incl.)', money(invoice.taxAmount - half)]);
+    totalRows.push(['Impuesto incluido (1/2)', money(half)]);
+    totalRows.push(['Impuesto incluido (2/2)', money(invoice.taxAmount - half)]);
   }
   if (invoice.loyaltyDiscount > 0) {
-    totalRows.push([`Loyalty (${invoice.pointsRedeemed} pts)`, `- ${money(invoice.loyaltyDiscount)}`]);
+    totalRows.push([`Descuento por puntos (${invoice.pointsRedeemed})`, `- ${money(invoice.loyaltyDiscount)}`]);
   }
-  if (invoice.returnValue > 0) totalRows.push(['Returns', `- ${money(invoice.returnValue)}`]);
-  if (invoice.creditApplied > 0) totalRows.push(['Store credit used', `- ${money(invoice.creditApplied)}`]);
+  if (invoice.returnValue > 0) totalRows.push(['Devoluciones', `- ${money(invoice.returnValue)}`]);
+  if (invoice.creditApplied > 0) totalRows.push(['Crédito en tienda usado', `- ${money(invoice.creditApplied)}`]);
 
   // With returns/credit, the customer pays (or is refunded) the net, not the
   // raw sale total. Decide the bold bottom line accordingly.
@@ -63,13 +75,13 @@ function buildReceiptHtml({ shop, invoice }) {
   // below — otherwise the receipt shows e.g. "Returns -500 / REFUND 200"
   // with no explanation for where the other 300 went.
   if (hasRefund && invoice.previousDuePaid > 0) {
-    totalRows.push(['Old Due Cleared', `- ${money(invoice.previousDuePaid)}`]);
+    totalRows.push(['Abono de deuda anterior', `- ${money(invoice.previousDuePaid)}`]);
   }
   const grandLabel = hasRefund
-    ? `REFUND (${invoice.refundMode === 'CREDIT' ? 'store credit' : 'cash'})`
+    ? `DEVOLUCIÓN (${invoice.refundMode === 'CREDIT' ? 'crédito en tienda' : 'efectivo'})`
     : invoice.returnValue > 0 || invoice.creditApplied > 0
-      ? 'NET PAYABLE'
-      : 'GRAND TOTAL';
+      ? 'TOTAL NETO'
+      : 'TOTAL';
   const grandValue = hasRefund ? invoice.refundValue : payable;
 
   return `<!doctype html>
@@ -81,29 +93,24 @@ function buildReceiptHtml({ shop, invoice }) {
   /* Kept deliberately tight: every extra pixel of vertical whitespace here
      is real thermal paper on every single receipt printed, forever. */
   * { box-sizing: border-box; }
-  /* THE fix for right-side clipping / drift. The sheet is an 80mm thermal
-     roll. Getting the geometry consistent is everything:
-       - @page margin 0: the page box is the FULL 80mm we ask for. (A
-         non-zero @page margin shrinks the page box below 80mm, and then an
-         80mm-wide body no longer fits — that was the original clipping bug.)
+  /* Keep the page and body at the selected thermal paper width:
+       - @page margin 0: the page box is the FULL paper width we ask for. A
+         non-zero margin shrinks the page box and can clip the receipt.
        - body is LEFT-ALIGNED (margin: 0, not "0 auto"), never centered.
          @page's custom size isn't honored by every printer/driver — some
-         fall back to whatever paper the OS has selected (often A4/Letter,
-         which is wider than 80mm). If that happens with a CENTERED body,
+         fall back to whatever paper the OS has selected (often A4/Letter).
+         If that happens with a CENTERED body,
          the receipt sits in the middle of that wider virtual page, and a
-         thermal head that only physically covers the page's left ~80mm
+         thermal head that only physically covers the page's left edge
          prints just a sliver of the left margin plus the receipt's own
          left edge — everything reads as pushed hard right and mostly gone.
          Left-aligning removes that failure mode entirely: the receipt
          always starts at column 0, which is where a thermal head starts
          printing regardless of how wide the browser thinks the sheet is.
-       - body is exactly 80mm with box-sizing border-box, so its 4mm padding
-         is subtracted FROM the 80mm, not added to it. Content is therefore
-         72mm wide and sits 4mm inside the left edge — clear of the small
-         non-printable strip every thermal head has — and never exceeds the
-         80mm sheet on the right either. */
+       - the body uses the selected width with box-sizing border-box, so its
+         padding is included within the paper width. */
   html { margin: 0; }
-  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 4mm; color: #111; width: 80mm; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 3mm; color: #111; width: ${paperWidth}mm; }
   p { margin: 0 0 3px; }
   .receipt { width: 100%; margin: 0; }
   h1 { font-size: 15px; text-align: center; margin: 0 0 2px; }
@@ -118,9 +125,13 @@ function buildReceiptHtml({ shop, invoice }) {
   .totals td { padding: 1px 0; }
   .grand td { font-weight: 700; font-size: 13px; border-top: 1px solid #111; padding-top: 3px; }
   .footer { text-align: center; margin-top: 6px; font-size: 11px; }
-  @page { size: 80mm auto; margin: 0; }
+  @page {
+    size: ${paperWidth}mm auto;
+    page-orientation: upright;
+    margin: 0;
+  }
   @media print {
-    html, body { width: 80mm; }
+    html, body { width: ${paperWidth}mm; }
     .no-print { display: none; }
   }
 </style>
@@ -139,19 +150,19 @@ function buildReceiptHtml({ shop, invoice }) {
     <p class="center muted">
       ${esc(shop.address1)}${shop.address2 ? `, ${esc(shop.address2)}` : ''}<br>
       ${[shop.city, shop.state].filter(Boolean).map(esc).join(', ')}
-      ${shop.phone ? `<br>Ph: ${esc(shop.phone)}` : ''}
+      ${shop.phone ? `<br>Teléfono: ${esc(shop.phone)}` : ''}
       ${shop.gstEnabled && shop.gstNumber ? `<br>GSTIN: ${esc(shop.gstNumber)}` : ''}
     </p>
     <hr class="rule">
     <p class="muted">
       ${esc(dateStr)}<br>
-      Bill: #${esc(invoice.invoiceNumber)}<br>
-      Cust: ${esc(invoice.customerName || 'Walk-in Customer')}${invoice.customerPhone ? ` · ${esc(invoice.customerPhone)}` : ''}
+      Factura: #${esc(invoice.invoiceNumber)}<br>
+      Cliente: ${esc(customerName)}${invoice.customerPhone ? ` · ${esc(invoice.customerPhone)}` : ''}
     </p>
     <hr class="rule">
     <table>
       <thead>
-        <tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
+        <tr><th>Artículo</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Importe</th></tr>
       </thead>
       <tbody>${itemRows}</tbody>
     </table>
@@ -165,24 +176,24 @@ function buildReceiptHtml({ shop, invoice }) {
         ? ''
         : `<hr class="rule">
     <table class="totals">
-      <tr><td>Paid (${esc(invoice.paymentMethod)})</td><td class="num">${money(invoice.amountPaid)}</td></tr>
+      <tr><td>Pagado (${esc(paymentMethod)})</td><td class="num">${money(invoice.amountPaid)}</td></tr>
       ${
         invoice.previousDuePaid > 0
-          ? `<tr><td>Old Due Cleared</td><td class="num">${money(invoice.previousDuePaid)}</td></tr>
-      <tr class="grand"><td>Total Collected</td><td class="num">${money(invoice.amountPaid + invoice.previousDuePaid)}</td></tr>`
+          ? `<tr><td>Abono de deuda anterior</td><td class="num">${money(invoice.previousDuePaid)}</td></tr>
+      <tr class="grand"><td>Total recibido</td><td class="num">${money(invoice.amountPaid + invoice.previousDuePaid)}</td></tr>`
           : ''
       }
-      ${invoice.changeDue > 0 ? `<tr><td>Change</td><td class="num">${money(invoice.changeDue)}</td></tr>` : ''}
-      ${invoice.dueAmount > 0 ? `<tr><td>Balance Due</td><td class="num">${money(invoice.dueAmount)}</td></tr>` : ''}
+      ${invoice.changeDue > 0 ? `<tr><td>Cambio</td><td class="num">${money(invoice.changeDue)}</td></tr>` : ''}
+      ${invoice.dueAmount > 0 ? `<tr><td>Saldo pendiente</td><td class="num">${money(invoice.dueAmount)}</td></tr>` : ''}
     </table>`
     }
     ${
       shop.loyaltyEnabled && invoice.pointsEarned > 0
-        ? `<p class="center muted">You earned ${invoice.pointsEarned} loyalty points!</p>`
+        ? `<p class="center muted">Ganaste ${invoice.pointsEarned} puntos de lealtad</p>`
         : ''
     }
     <hr class="rule">
-    <p class="footer">${esc(shop.receiptFooter || 'Thank You! Visit Again.').replace(/\n/g, '<br>')}</p>
+    <p class="footer">${esc(shop.receiptFooter || 'Gracias por su compra. ¡Vuelva pronto!').replace(/\n/g, '<br>')}</p>
   </div>
 </body>
 </html>`;

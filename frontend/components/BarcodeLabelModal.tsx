@@ -20,16 +20,16 @@ export function BarcodeLabelModal({ product, onClose }: { product: Product; onCl
       >
         <div className="mb-5 flex items-center justify-between">
           <h2 id="barcode-modal-title" className="text-lg font-semibold text-foreground">
-            Barcode label
+            Etiqueta de código de barras
           </h2>
-          <button type="button" aria-label="Close dialog" onClick={onClose} className="text-foreground/40 hover:text-foreground">
+          <button type="button" aria-label="Cerrar diálogo" onClick={onClose} className="text-foreground/40 hover:text-foreground">
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
         <p className="mb-4 text-sm text-foreground/70">{product.name}</p>
 
-        <BarcodeDownloadPanel value={product.barcode} />
+        <BarcodeDownloadPanel value={product.barcode} name={product.name} />
       </div>
     </div>
   );

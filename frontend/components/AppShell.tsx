@@ -17,8 +17,6 @@ import {
   Search,
   Bell,
   ChevronDown,
-  Cloud,
-  CloudOff,
   CalendarRange,
 } from "lucide-react";
 import { clsx } from "clsx";
@@ -26,8 +24,6 @@ import { api } from "@/lib/api";
 import { useShopSettings } from "@/hooks/useShopSettings";
 import { useMe } from "@/hooks/useAuth";
 import { useLowStock } from "@/hooks/useProducts";
-import { useSyncStatus } from "@/hooks/useSyncStatus";
-import { BrandFooter } from "@/components/BrandFooter";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -51,7 +47,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { data: shop } = useShopSettings();
   const { data: me } = useMe();
   const { data: lowStock } = useLowStock();
-  const { data: health } = useSyncStatus();
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -88,7 +83,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const visibleItems = NAV_ITEMS.filter(
     (item) => !item.adminOnly || me?.role === "admin",
   );
-  const isOnline = health?.status === "ok";
   const sym = shop?.currencySymbol || "Rs.";
 
   return (
@@ -198,7 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 {me.name}
               </p>
               <p className="text-xs capitalize text-foreground-muted">
-                {me.role}
+                {me.role === "admin" ? "Administrador" : "Cajero"}
               </p>
             </div>
           )}
@@ -209,20 +203,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LogOut className="h-[18px] w-[18px]" aria-hidden="true" />
             Cerrar sesión
           </button>
-          <div className="mt-3 flex items-center gap-1.5 px-3 text-[11px] text-foreground-muted">
-            {isOnline ? (
-              <Cloud className="h-3.5 w-3.5 text-success" aria-hidden="true" />
-            ) : (
-              <CloudOff
-                className="h-3.5 w-3.5 text-warning"
-                aria-hidden="true"
-              />
-            )}
-            {isOnline
-              ? "Sincronizado con el servidor local"
-              : "Servidor local inaccesible"}
-          </div>
-          <BrandFooter className="mt-2" />
         </div>
       </aside>
 
@@ -295,7 +275,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       {me?.name}
                     </p>
                     <p className="text-xs capitalize text-foreground-muted">
-                      {me?.role}
+                      {me?.role === "admin" ? "Administrador" : "Cajero"}
                     </p>
                   </div>
                   {me?.role === "admin" && (

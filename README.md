@@ -413,6 +413,19 @@ the vast majority of consumer scanners) works out of the box. The frontend's
 keystrokes and, based on inter-keystroke timing, tells scanner input apart
 from a human typing so it never interferes with normal form fields.
 
+### DYMO label printers
+
+The product form can send a product name and barcode directly to a connected
+DYMO tape printer through the DYMO Connect Framework. Install DYMO Connect
+on the same computer that opens localPos in the browser and connect the
+printer to that computer by USB. This local DYMO service is required even
+when localPos itself is hosted on a VPS; the VPS does not print to the USB
+device. The 9 mm label layout is stored at
+[`frontend/public/labels/barcode-9mm.dymo`](frontend/public/labels/barcode-9mm.dymo);
+it can be edited in DYMO Connect and reused by the app. The DYMO framework
+license is included under
+[`frontend/public/vendor`](frontend/public/vendor).
+
 ### Camera barcode & QR scanning
 
 No USB scanner? Every place a barcode can be typed or scanned — POS
@@ -536,6 +549,10 @@ Turn on **Settings → Receipt → Print automatically after every sale** to
 open the browser's print dialog when a sale completes. The browser may pause
 while the dialog is open; printer selection remains under the cashier's
 control.
+
+In **Settings → Receipt**, choose the thermal receipt width: 58 mm (default)
+or 80 mm. The selected width is used for both browser printing and downloaded
+PDF receipts.
 
 Both the HTML and PDF layouts are kept deliberately tight, since every
 extra millimetre of whitespace is recurring thermal paper cost. The HTML

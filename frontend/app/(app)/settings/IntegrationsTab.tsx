@@ -23,12 +23,12 @@ export function IntegrationsTab() {
       <Card className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-base font-semibold text-foreground">External Stock API</h2>
+            <h2 className="text-base font-semibold text-foreground">API externa de inventario</h2>
             <p className="mt-1 text-sm text-foreground/60">
-              Lets another system — e.g. an e-commerce storefront — read live stock for products you link by SKU,
-              and (if the key allows it) report its own sales back so stock stays in sync automatically. Products are
-              matched by the SKU field on each product (Inventory → edit product); a product with no SKU is never
-              exposed here.
+              Permite que otro sistema, como una tienda en línea, consulte las existencias actuales de los productos
+              vinculados por SKU y, si la clave lo permite, informe sus ventas para mantener el inventario sincronizado.
+              Los productos se relacionan por el campo SKU de cada producto (Inventario → editar producto); los
+              productos sin SKU no se comparten.
             </p>
           </div>
           <KeyRound className="h-5 w-5 shrink-0 text-foreground/30" aria-hidden="true" />
@@ -41,13 +41,13 @@ export function IntegrationsTab() {
           }}
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
-          New API key
+          Nueva clave API
         </Button>
 
         {isLoading ? (
-          <p className="mt-4 text-sm text-foreground/50">Loading…</p>
+          <p className="mt-4 text-sm text-foreground/50">Cargando…</p>
         ) : !keys || keys.length === 0 ? (
-          <p className="mt-4 text-sm text-foreground/50">No integrations yet.</p>
+          <p className="mt-4 text-sm text-foreground/50">Aún no hay integraciones.</p>
         ) : (
           <ul className="mt-4 flex flex-col divide-y divide-border">
             {keys.map((k) => (
@@ -95,18 +95,18 @@ function ApiKeyRow({
   const del = useDeleteApiKey();
 
   async function toggleRevoke() {
-    const result = await withPasswordConfirm(apiKey.revoked ? "re-enable this key" : "revoke this key", (confirmPassword) =>
+    const result = await withPasswordConfirm(apiKey.revoked ? "volver a habilitar esta clave" : "revocar esta clave", (confirmPassword) =>
       update.mutateAsync({ id: apiKey.id, revoked: !apiKey.revoked, confirmPassword })
     );
-    if (result) show(apiKey.revoked ? "Key re-enabled" : "Key revoked", "success");
+    if (result) show(apiKey.revoked ? "Clave habilitada nuevamente" : "Clave revocada", "success");
   }
 
   async function remove() {
-    if (!window.confirm(`Delete "${apiKey.name}"? Anything using this key will stop working immediately.`)) return;
-    const result = await withPasswordConfirm("delete this API key", (confirmPassword) =>
+    if (!window.confirm(`¿Eliminar "${apiKey.name}"? Todo lo que use esta clave dejará de funcionar inmediatamente.`)) return;
+    const result = await withPasswordConfirm("eliminar esta clave API", (confirmPassword) =>
       del.mutateAsync({ id: apiKey.id, confirmPassword })
     );
-    if (result !== undefined) show("Key deleted", "success");
+    if (result !== undefined) show("Clave eliminada", "success");
   }
 
   void onRevealed; // reserved for a future "rotate" action on this row
@@ -121,26 +121,28 @@ function ApiKeyRow({
               apiKey.canWrite ? "bg-brand/10 text-brand" : "bg-surface-muted text-foreground/60"
             }`}
           >
-            {apiKey.canWrite ? "Read + write" : "Read-only"}
+            {apiKey.canWrite ? "Lectura y escritura" : "Solo lectura"}
           </span>
           {apiKey.revoked && (
-            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">Revoked</span>
+            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">Revocada</span>
           )}
         </div>
         <p className="mt-0.5 text-xs text-foreground/50">
-          nk_live_{apiKey.keyPrefix}… · {apiKey.webhookUrl ? "webhook configured" : "no webhook"} ·{" "}
-          {apiKey.lastUsedAt ? `last used ${new Date(apiKey.lastUsedAt).toLocaleString()}` : "never used"}
+          nk_live_{apiKey.keyPrefix}… · {apiKey.webhookUrl ? "Webhook configurado" : "Sin webhook"} ·{" "}
+          {apiKey.lastUsedAt
+            ? `Último uso: ${new Date(apiKey.lastUsedAt).toLocaleString("es-CO")}`
+            : "Nunca utilizada"}
         </p>
       </div>
       <div className="flex gap-2">
         <Button variant="secondary" onClick={onEdit}>
-          Edit
+          Editar
         </Button>
         <Button variant="secondary" onClick={toggleRevoke} disabled={update.isPending}>
-          {apiKey.revoked ? "Re-enable" : "Revoke"}
+          {apiKey.revoked ? "Habilitar" : "Revocar"}
         </Button>
         <Button variant="danger" onClick={remove} disabled={del.isPending}>
-          Delete
+          Eliminar
         </Button>
       </div>
     </li>
@@ -180,7 +182,7 @@ function ApiKeyFormModal({
         // PUT, so including it unchanged on every rename/toggle edit would
         // silently invalidate a storefront's already-configured secret.
         const webhookChanged = webhookUrl !== (editing.webhookUrl ?? "");
-        const result = await withPasswordConfirm("update this API key", (confirmPassword) =>
+        const result = await withPasswordConfirm("actualizar esta clave API", (confirmPassword) =>
           update.mutateAsync({
             id: editing.id,
             name,
@@ -193,59 +195,59 @@ function ApiKeyFormModal({
           if (result.webhookSecret) {
             onCreated(result); // webhook URL changed — new secret to show once
           } else {
-            show("API key updated", "success");
+            show("Clave API actualizada", "success");
             onClose();
           }
         }
       } else {
-        const result = await withPasswordConfirm("create this API key", (confirmPassword) =>
+        const result = await withPasswordConfirm("crear esta clave API", (confirmPassword) =>
           create.mutateAsync({ name, canWrite, webhookUrl, confirmPassword })
         );
         if (result) onCreated(result);
       }
     } catch (err) {
-      setError(describeApiError(err, "Could not save this API key"));
+      setError(describeApiError(err, "No se pudo guardar la clave API"));
     }
   }
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true">
       <Card className="w-full max-w-md p-6">
-        <h2 className="text-base font-semibold text-foreground">{editing ? "Edit API key" : "New API key"}</h2>
+        <h2 className="text-base font-semibold text-foreground">{editing ? "Editar clave API" : "Nueva clave API"}</h2>
         <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
           <Field
-            label="Name"
-            placeholder="e.g. Photorbit.in storefront"
+            label="Nombre"
+            placeholder="Por ejemplo, tienda en línea"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
           />
           <Toggle
-            label="Allow write access"
-            description="Lets this key adjust stock (e.g. report a sale). Off = read-only stock lookups."
+            label="Permitir escritura"
+            description="Permite que esta clave actualice las existencias (por ejemplo, al informar una venta). Desactivado = solo consultas de inventario."
             checked={canWrite}
             onChange={setCanWrite}
           />
           <div>
             <Field
-              label="Webhook URL (optional)"
+              label="URL del webhook (opcional)"
               type="url"
-              placeholder="https://your-storefront.com/api/webhooks/nodedr-pos"
+              placeholder="https://tu-tienda.com/api/webhooks/nodedr-pos"
               value={webhookUrl}
               onChange={(e) => setWebhookUrl(e.target.value)}
             />
             <p className="mt-1 text-xs text-foreground/50">
-              If set, this shop notifies that URL (HTTPS only, signed) whenever a linked product&apos;s stock
-              changes — a sale, a return, or a manual edit.
+              Si la configuras, se notificará a esa dirección (solo HTTPS y con firma) cuando cambien las existencias
+              de un producto vinculado, ya sea por una venta, devolución o ajuste manual.
             </p>
           </div>
           {error && <p className="text-sm text-danger">{error}</p>}
           <div className="mt-1 flex gap-3">
             <Button type="button" variant="secondary" className="flex-1" onClick={onClose} disabled={busy}>
-              Cancel
+              Cancelar
             </Button>
             <Button type="submit" className="flex-1" disabled={busy || !name}>
-              {busy ? "Saving…" : editing ? "Save changes" : "Create key"}
+              {busy ? "Guardando…" : editing ? "Guardar cambios" : "Crear clave"}
             </Button>
           </div>
         </form>
@@ -259,31 +261,31 @@ function SecretRevealModal({ result, onClose }: { result: ApiKeyWithSecrets; onC
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true">
       <Card className="w-full max-w-lg p-6">
         <h2 className="text-base font-semibold text-foreground">
-          {result.apiKey ? "API key created" : "Webhook secret rotated"}
+          {result.apiKey ? "Clave API creada" : "Se renovó el secreto del webhook"}
         </h2>
         <p className="mt-1 text-sm text-warning">
-          Copy these now — for your security, they are shown only once and cannot be retrieved again.
+          Cópialos ahora: por seguridad, solo se muestran una vez y no se podrán recuperar después.
         </p>
         <div className="mt-4 flex flex-col gap-3">
-          {result.apiKey && <SecretField label="API key" value={result.apiKey} />}
-          {result.webhookSecret && <SecretField label="Webhook signing secret" value={result.webhookSecret} />}
+          {result.apiKey && <SecretField label="Clave API" value={result.apiKey} />}
+          {result.webhookSecret && <SecretField label="Secreto de firma del webhook" value={result.webhookSecret} />}
         </div>
         {result.apiKey && (
           <p className="mt-3 text-xs text-foreground/50">
-            Send it as <code className="rounded bg-surface-muted px-1 py-0.5">Authorization: Bearer &lt;key&gt;</code> on
-            every call to <code className="rounded bg-surface-muted px-1 py-0.5">/api/external/...</code>.
+            Envíala como <code className="rounded bg-surface-muted px-1 py-0.5">Authorization: Bearer &lt;key&gt;</code> en cada
+            solicitud a <code className="rounded bg-surface-muted px-1 py-0.5">/api/external/...</code>.
           </p>
         )}
         {result.webhookSecret && (
           <p className="mt-1 text-xs text-foreground/50">
-            Verify each webhook delivery&apos;s{" "}
-            <code className="rounded bg-surface-muted px-1 py-0.5">X-Nodedr-Signature</code> header — it&apos;s an
-            HMAC-SHA256 of the raw request body using this secret, formatted as{" "}
+            Verifica el encabezado{" "}
+            <code className="rounded bg-surface-muted px-1 py-0.5">X-Nodedr-Signature</code> de cada webhook: contiene
+            un HMAC-SHA256 del cuerpo original de la solicitud, firmado con este secreto y con el formato{" "}
             <code className="rounded bg-surface-muted px-1 py-0.5">sha256=&lt;hex&gt;</code>.
           </p>
         )}
         <Button className="mt-5 w-full" onClick={onClose}>
-          I&apos;ve copied these — close
+          Ya los copié — cerrar
         </Button>
       </Card>
     </div>
@@ -306,7 +308,7 @@ function SecretField({ label, value }: { label: string; value: string }) {
         <code className="flex-1 overflow-x-auto rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-xs text-foreground">
           {value}
         </code>
-        <Button type="button" variant="secondary" onClick={copy} aria-label={`Copy ${label}`}>
+        <Button type="button" variant="secondary" onClick={copy} aria-label={`Copiar ${label}`}>
           {copied ? <Check className="h-4 w-4" aria-hidden="true" /> : <Copy className="h-4 w-4" aria-hidden="true" />}
         </Button>
       </div>

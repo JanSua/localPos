@@ -40,11 +40,11 @@ model ShopSettings {
   pointValue     Float    @default(0) // currency value of 1 point when redeemed
   // Receipt customisation
   receiptHeader  String?
-  receiptFooter  String   @default("Thank You! Visit Again.")
+  receiptFooter  String   @default("Gracias por su compra. ¡Vuelva pronto!")
   showGst        Boolean  @default(true)
   autoPrintReceipt Boolean @default(false)
-  // Legacy printing settings retained for existing database compatibility.
-  usbPrinterWidth Int @default(80)
+  // Thermal receipt width in millimeters.
+  usbPrinterWidth Int @default(58)
   autoPrintMethod String @default("browser")
   // Inventory
   lowStockAlert  Int      @default(5)

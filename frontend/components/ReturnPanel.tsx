@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Search, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+import { MoneyField } from "@/components/ui/MoneyField";
 import { useToast } from "@/components/Toast";
 import { api, ApiError } from "@/lib/api";
 import { formatMoney, round2 } from "@/lib/format";
@@ -157,18 +158,23 @@ export function ReturnPanel({ sym, drafted, onAdd, onInvoiceFound }: Props) {
                   value={r.qty || ""}
                   onChange={(e) => setQty(r.invoiceItemId, Number(e.target.value) || 0)}
                   aria-label={`Return quantity for ${r.name}`}
-                  placeholder="0"
+                  placeholder={money(0)}
                   className="w-14 rounded-lg border border-border bg-surface px-2 py-1.5 text-right text-sm text-foreground"
                 />
-                <input
-                  type="number"
-                  min={0}
-                  step="0.01"
+                <MoneyField
                   disabled={r.qty === 0}
                   value={r.refund}
-                  onChange={(e) => setRows((prev) => prev.map((x) => (x.invoiceItemId === r.invoiceItemId ? { ...x, refund: e.target.value } : x)))}
+                  onChange={(value) =>
+                    setRows((prev) =>
+                      prev.map((x) =>
+                        x.invoiceItemId === r.invoiceItemId
+                          ? { ...x, refund: value === null ? "" : String(value) }
+                          : x,
+                      ),
+                    )
+                  }
                   aria-label={`Refund amount for ${r.name}`}
-                  placeholder={money(0)}
+                  placeholder="0"
                   title="Refund amount (editable)"
                   className="w-20 rounded-lg border border-border bg-surface px-2 py-1.5 text-right text-sm text-foreground disabled:opacity-50"
                 />

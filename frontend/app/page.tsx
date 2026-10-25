@@ -9,7 +9,6 @@ import {
   GitFork,
   ChevronDown,
 } from "lucide-react";
-import { BrandFooter } from "@/components/BrandFooter";
 import { HomeAuthRedirect } from "@/components/HomeAuthRedirect";
 import { QuickstartCommand } from "@/components/QuickstartCommand";
 import { ReceiptHero } from "@/components/ReceiptHero";
@@ -299,7 +298,6 @@ export default function HomePage() {
           </p>
         </section>
 
-        <BrandFooter />
       </main>
     </>
   );

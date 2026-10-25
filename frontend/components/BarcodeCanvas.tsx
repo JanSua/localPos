@@ -11,7 +11,7 @@ export function BarcodeCanvas({
   className,
 }: {
   value: string;
-  format: "EAN13" | "QR";
+  format: "CODE128" | "QR";
   id: string;
   className?: string;
 }) {

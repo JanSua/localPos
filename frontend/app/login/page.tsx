@@ -9,7 +9,6 @@ import { z } from "zod";
 import { Field } from "@/components/ui/Field";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { BrandFooter } from "@/components/BrandFooter";
 import { api, ApiError } from "@/lib/api";
 
 const loginSchema = z.object({
@@ -70,7 +69,6 @@ export default function LoginPage() {
           </Button>
         </form>
       </Card>
-      <BrandFooter />
     </main>
   );
 }

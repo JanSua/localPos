@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Barcode as BarcodeIcon, Camera, X } from "lucide-react";
 import { Field } from "@/components/ui/Field";
-import { Select } from "@/components/ui/Select";
+import { MoneyField } from "@/components/ui/MoneyField";
 import { Button } from "@/components/ui/Button";
-import { BarcodeDownloadPanel } from "@/components/BarcodeDownloadPanel";
+import {
+  BarcodeDownloadPanel,
+  BarcodePrintButton,
+} from "@/components/BarcodeDownloadPanel";
 import { CameraScannerModal } from "@/components/CameraScannerModal";
 import {
   useCreateProduct,
@@ -23,17 +26,14 @@ import { formatMoney } from "@/lib/format";
 import {
   GENERIC_PRODUCT_CATEGORIES,
   GST_RATES,
-  UQC_UNITS,
 } from "@/lib/masters";
 import type { Product } from "@/lib/types";
 
 const productSchema = z.object({
   barcode: z.string().trim().min(1, "El código de barras es obligatorio"),
-  sku: z.string().trim().optional(),
   name: z.string().trim().min(1, "El nombre del producto es obligatorio"),
   category: z.string().trim().optional(),
   hsn: z.string().trim().optional(),
-  unit: z.string().trim().optional(),
   purchasePrice: z.number().min(0, "Debe ser 0 o más"),
   sellingPrice: z.number().min(0, "Debe ser 0 o más"),
   taxRate: z.number().min(0).max(100),
@@ -42,11 +42,6 @@ const productSchema = z.object({
   stock: z.number().int().min(0, "Debe ser 0 o más"),
 });
 type ProductForm = z.infer<typeof productSchema>;
-
-const UNIT_OPTIONS = [
-  { value: "", label: "Sin unidad" },
-  ...UQC_UNITS.map((u) => ({ value: u.code, label: `${u.code} — ${u.name}` })),
-];
 
 interface TaxCodeSuggestion {
   code: string;
@@ -82,11 +77,9 @@ export function ProductModal({
     resolver: zodResolver(productSchema),
     defaultValues: {
       barcode: product?.barcode ?? initialBarcode ?? "",
-      sku: product?.sku ?? "",
       name: product?.name ?? "",
       category: product?.category ?? "",
       hsn: product?.hsn ?? "",
-      unit: product?.unit ?? "",
       purchasePrice: product?.purchasePrice ?? 0,
       sellingPrice: product?.sellingPrice ?? 0,
       taxRate: product?.taxRate ?? shop?.defaultTaxRate ?? 0,
@@ -128,6 +121,7 @@ export function ProductModal({
   const taxRate = useWatch({ control, name: "taxRate" });
   const hsnValue = useWatch({ control, name: "hsn" });
   const barcodeValue = useWatch({ control, name: "barcode" });
+  const productName = useWatch({ control, name: "name" });
   const sellingPrice = useWatch({ control, name: "sellingPrice" });
   const discountType = useWatch({ control, name: "discountType" });
   const discountValue = useWatch({ control, name: "discountValue" });
@@ -252,19 +246,29 @@ export function ProductModal({
             />
           )}
           {barcodeValue?.trim() && (
-            <div>
-              <button
-                type="button"
-                onClick={() => setShowBarcodeImage((v) => !v)}
-                className="text-sm font-medium text-brand hover:underline"
-              >
-                {showBarcodeImage
-                  ? "Ocultar imagen del código de barras"
-                  : "Obtener imagen del código de barras para imprimir (PNG/JPG)"}
-              </button>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <BarcodePrintButton
+                  name={productName?.trim() ?? ""}
+                  value={barcodeValue.trim()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowBarcodeImage((v) => !v)}
+                  className="text-sm font-medium text-brand hover:underline"
+                >
+                  {showBarcodeImage
+                    ? "Ocultar imagen del código de barras"
+                    : "Obtener imagen del código de barras para imprimir (PNG/JPG)"}
+                </button>
+              </div>
               {showBarcodeImage && (
-                <div className="mt-3">
-                  <BarcodeDownloadPanel value={barcodeValue.trim()} />
+                <div>
+                  <BarcodeDownloadPanel
+                    value={barcodeValue.trim()}
+                    name={productName?.trim() ?? ""}
+                    showPrintButton={false}
+                  />
                 </div>
               )}
             </div>
@@ -274,32 +278,11 @@ export function ProductModal({
             error={errors.name?.message}
             {...register("name")}
           />
-          <div>
-            <Field
-              label="SKU (opcional)"
-              placeholder="Vincula este producto a un sistema externo"
-              error={errors.sku?.message}
-              {...register("sku")}
-            />
-            <p className="mt-1 text-xs text-foreground/50">
-              Se usa para emparejar este producto con una tienda de comercio
-              electrónico a través de la API de Stock Externo — consulta
-              Configuración → Integraciones. Déjalo en blanco si este producto
-              no se vende en ningún otro lugar.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Field
-              label="Categoría"
-              list="category-options"
-              {...register("category")}
-            />
-            <Select
-              label="Unidad"
-              options={UNIT_OPTIONS}
-              {...register("unit")}
-            />
-          </div>
+          <Field
+            label="Categoría"
+            list="category-options"
+            {...register("category")}
+          />
           {gst && (
             <Field label="HSN / SAC" list="hsn-options" {...register("hsn")} />
           )}
@@ -316,21 +299,35 @@ export function ProductModal({
             ))}
           </datalist>
           <div className="grid grid-cols-2 gap-4">
-            <Field
-              label="Precio de compra"
-              type="number"
-              step="0.01"
-              min={0}
-              error={errors.purchasePrice?.message}
-              {...register("purchasePrice", { valueAsNumber: true })}
+            <Controller
+              control={control}
+              name="purchasePrice"
+              render={({ field }) => (
+                <MoneyField
+                  label="Precio de compra"
+                  value={field.value}
+                  onChange={(value) => field.onChange(value ?? 0)}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                  error={errors.purchasePrice?.message}
+                />
+              )}
             />
-            <Field
-              label="Precio de venta"
-              type="number"
-              step="0.01"
-              min={0}
-              error={errors.sellingPrice?.message}
-              {...register("sellingPrice", { valueAsNumber: true })}
+            <Controller
+              control={control}
+              name="sellingPrice"
+              render={({ field }) => (
+                <MoneyField
+                  label="Precio de venta"
+                  value={field.value}
+                  onChange={(value) => field.onChange(value ?? 0)}
+                  onBlur={field.onBlur}
+                  name={field.name}
+                  ref={field.ref}
+                  error={errors.sellingPrice?.message}
+                />
+              )}
             />
           </div>
           <div>
@@ -349,15 +346,41 @@ export function ProductModal({
                 <option value="percent">%</option>
                 <option value="amount">{sym}</option>
               </select>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                disabled={!discountType}
-                placeholder="Valor del descuento"
-                aria-label="Valor del descuento"
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground disabled:opacity-50"
-                {...register("discountValue", { valueAsNumber: true })}
+              <Controller
+                control={control}
+                name="discountValue"
+                render={({ field }) =>
+                  discountType === "percent" ? (
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      disabled={!discountType}
+                      placeholder="Valor del descuento"
+                      aria-label="Valor del descuento"
+                      className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground disabled:opacity-50"
+                      name={field.name}
+                      ref={field.ref}
+                      onBlur={field.onBlur}
+                      value={field.value}
+                      onChange={(event) =>
+                        field.onChange(Number(event.target.value) || 0)
+                      }
+                    />
+                  ) : (
+                    <MoneyField
+                      value={field.value}
+                      onChange={(value) => field.onChange(value ?? 0)}
+                      onBlur={field.onBlur}
+                      name={field.name}
+                      ref={field.ref}
+                      disabled={!discountType}
+                      placeholder="Valor del descuento"
+                      aria-label="Valor del descuento"
+                      className="w-full disabled:opacity-50"
+                    />
+                  )
+                }
               />
             </div>
             {errors.discountValue?.message && (

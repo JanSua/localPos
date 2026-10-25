@@ -12,7 +12,6 @@ import { Select } from "@/components/ui/Select";
 import { Toggle } from "@/components/ui/Toggle";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { BrandFooter } from "@/components/BrandFooter";
 import { useCurrencies } from "@/hooks/useShopSettings";
 import { api, ApiError } from "@/lib/api";
 
@@ -325,7 +324,6 @@ export default function OnboardingPage() {
           </div>
         )}
       </Card>
-      <BrandFooter />
     </main>
   );
 }

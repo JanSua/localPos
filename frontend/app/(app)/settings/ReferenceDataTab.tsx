@@ -15,12 +15,9 @@ import {
   type IfscRecord,
 } from "@/hooks/useMasters";
 
-// Bulk reference data (full HSN/SAC catalogs, PIN codes, IFSC codes) is
-// deliberately NOT bundled with the app — these are large, frequently-
-// revised government/RBI datasets, and a stale or subtly wrong snapshot
-// risks real tax-filing or banking mistakes. Instead: import the current
-// official CSV yourself, whenever you have it. See README > Reference
-// data & validation.
+// Los catálogos de referencia HSN/SAC, códigos PIN e IFSC no se incluyen
+// con la aplicación porque son grandes y se actualizan con frecuencia.
+// Importa los archivos CSV vigentes cuando los tengas disponibles.
 export function ReferenceDataTab() {
   const { data: summary } = useMastersSummary();
 
@@ -63,7 +60,7 @@ function ImportRow({
           onClick={() => file && onImport(file)}
         >
           <Upload className="h-4 w-4" aria-hidden="true" />
-          Import
+          Importar
         </Button>
       </div>
     </div>
@@ -77,29 +74,31 @@ function TaxCodeImportCard({ count }: { count?: { hsn: number; sac: number } }) 
   async function handle(type: "HSN" | "SAC", file: File) {
     try {
       const res = await importTaxCodes.mutateAsync({ type, file });
-      show(`Imported ${res.imported} ${type} codes`, "success");
+      show(`Se importaron ${res.imported} códigos ${type}`, "success");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : `Could not import ${type} codes`, "error");
+      show(err instanceof ApiError ? err.message : `No se pudieron importar los códigos ${type}`, "error");
     }
   }
 
   return (
     <Card className="p-6">
-      <h2 className="mb-1 text-base font-semibold text-foreground">HSN / SAC codes</h2>
+      <h2 className="mb-1 text-base font-semibold text-foreground">Códigos HSN / SAC</h2>
       <p className="mb-4 text-sm text-foreground/60">
-        {count ? `${count.hsn} HSN + ${count.sac} SAC codes loaded` : "None loaded yet"} — powers autocomplete on the
-        product HSN/SAC field.
+        {count
+          ? `${count.hsn} códigos HSN + ${count.sac} códigos SAC cargados`
+          : "Aún no hay datos cargados"} — habilita
+        las sugerencias del campo HSN/SAC de los productos.
       </p>
       <div className="flex flex-col gap-3">
         <ImportRow
-          label="HSN codes"
-          hint='CSV columns: code, description, gstRate (optional). Source: the CBIC HSN directory.'
+          label="Códigos HSN"
+          hint='Encabezados CSV: code, description, gstRate (opcional; deben conservarse en inglés). Fuente: directorio HSN del CBIC.'
           onImport={(f) => handle("HSN", f)}
           isPending={importTaxCodes.isPending}
         />
         <ImportRow
-          label="SAC codes"
-          hint='CSV columns: code, description, gstRate (optional). Source: the CBIC SAC directory.'
+          label="Códigos SAC"
+          hint='Encabezados CSV: code, description, gstRate (opcional; deben conservarse en inglés). Fuente: directorio SAC del CBIC.'
           onImport={(f) => handle("SAC", f)}
           isPending={importTaxCodes.isPending}
         />
@@ -115,22 +114,22 @@ function PinCodeImportCard({ count }: { count?: number }) {
   async function handle(file: File) {
     try {
       const res = await importPincodes.mutateAsync(file);
-      show(`Imported ${res.imported} PIN codes`, "success");
+      show(`Se importaron ${res.imported} códigos PIN`, "success");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not import PIN codes", "error");
+      show(err instanceof ApiError ? err.message : "No se pudieron importar los códigos PIN", "error");
     }
   }
 
   return (
     <Card className="p-6">
-      <h2 className="mb-1 text-base font-semibold text-foreground">PIN codes</h2>
+      <h2 className="mb-1 text-base font-semibold text-foreground">Códigos PIN</h2>
       <p className="mb-4 text-sm text-foreground/60">
-        {count ? `${count} PIN codes loaded` : "None loaded yet"} — enables city/state autofill from a PIN code in
-        Company settings.
+        {count ? `${count} códigos PIN cargados` : "Aún no hay datos cargados"} — permite completar automáticamente
+        la ciudad y el estado a partir del código PIN en la configuración de empresa.
       </p>
       <ImportRow
-        label="PIN code directory"
-        hint="CSV columns: pincode, area, district, state. Source: the India Post / data.gov.in PIN code directory."
+        label="Directorio de códigos PIN"
+        hint="Encabezados CSV: pincode, area, district, state (deben conservarse en inglés). Fuente: directorio de códigos PIN de India Post / data.gov.in."
         onImport={handle}
         isPending={importPincodes.isPending}
       />
@@ -148,9 +147,9 @@ function IfscCard({ count }: { count?: number }) {
   async function handleImport(file: File) {
     try {
       const res = await importIfsc.mutateAsync(file);
-      show(`Imported ${res.imported} IFSC codes`, "success");
+      show(`Se importaron ${res.imported} códigos IFSC`, "success");
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "Could not import IFSC codes", "error");
+      show(err instanceof ApiError ? err.message : "No se pudieron importar los códigos IFSC", "error");
     }
   }
 
@@ -162,7 +161,7 @@ function IfscCard({ count }: { count?: number }) {
       const record = await api.get<IfscRecord>(`/masters/ifsc/${encodeURIComponent(query.trim().toUpperCase())}`);
       setResult(record);
     } catch (err) {
-      show(err instanceof ApiError ? err.message : "IFSC code not found", "info");
+      show(err instanceof ApiError ? err.message : "No se encontró el código IFSC", "info");
     } finally {
       setSearching(false);
     }
@@ -170,26 +169,26 @@ function IfscCard({ count }: { count?: number }) {
 
   return (
     <Card className="p-6">
-      <h2 className="mb-1 text-base font-semibold text-foreground">IFSC codes</h2>
+      <h2 className="mb-1 text-base font-semibold text-foreground">Códigos IFSC</h2>
       <p className="mb-4 text-sm text-foreground/60">
-        {count ? `${count} IFSC codes loaded` : "None loaded yet"} — a standalone bank/branch lookup tool.
+        {count ? `${count} códigos IFSC cargados` : "Aún no hay datos cargados"} — herramienta para consultar bancos y sucursales.
       </p>
       <ImportRow
-        label="IFSC directory"
-        hint="CSV columns: ifsc, bank, branch, address, district, state. Source: the RBI IFSC directory."
+        label="Directorio IFSC"
+        hint="Encabezados CSV: ifsc, bank, branch, address, district, state (deben conservarse en inglés). Fuente: directorio IFSC del RBI."
         onImport={handleImport}
         isPending={importIfsc.isPending}
       />
       <div className="mt-4 flex items-end gap-2">
         <div className="flex-1">
           <Field
-            label="Look up an IFSC code"
+            label="Consultar un código IFSC"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. SBIN0001234"
+            placeholder="Por ejemplo, SBIN0001234"
           />
         </div>
-        <Button type="button" variant="secondary" onClick={lookup} disabled={searching} aria-label="Search IFSC">
+        <Button type="button" variant="secondary" onClick={lookup} disabled={searching} aria-label="Buscar código IFSC">
           <Search className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>

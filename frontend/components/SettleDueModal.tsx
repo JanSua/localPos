@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Field } from "@/components/ui/Field";
+import { MoneyField } from "@/components/ui/MoneyField";
 import { useSettleDue } from "@/hooks/useCustomers";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/api";
@@ -19,19 +19,18 @@ export function SettleDueModal({
   sym: string;
   onClose: () => void;
 }) {
-  const [amount, setAmount] = useState(String(customer.totalDue));
+  const [amount, setAmount] = useState(Math.round(customer.totalDue));
   const settleDue = useSettleDue();
   const { show } = useToast();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    const n = Number(amount);
-    if (!Number.isFinite(n) || n <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       show("Ingresa un monto mayor a 0", "error");
       return;
     }
     try {
-      await settleDue.mutateAsync({ id: customer.id, amount: n });
+      await settleDue.mutateAsync({ id: customer.id, amount });
       show(`Pago registrado para ${customer.name}`, "success");
       onClose();
     } catch (err) {
@@ -78,15 +77,11 @@ export function SettleDueModal({
           </span>
         </p>
         <form onSubmit={submit} className="flex flex-col gap-4">
-          <Field
+          <MoneyField
             label="Monto recibido"
-            type="number"
-            min={0}
-            max={customer.totalDue}
-            step="0.01"
             autoFocus
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(value) => setAmount(value ?? 0)}
           />
           <div className="flex justify-end gap-3">
             <Button type="button" variant="secondary" onClick={onClose}>

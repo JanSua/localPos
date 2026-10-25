@@ -35,6 +35,7 @@ const fields = {
   receiptFooter: z.string().trim().max(200),
   showGst: z.boolean(),
   autoPrintReceipt: z.boolean(),
+  usbPrinterWidth: z.union([z.literal(58), z.literal(80)]),
   lowStockAlert: z.number().int().min(0).max(100000),
   allowNegativeStock: z.boolean(),
 };
@@ -48,9 +49,10 @@ const createSchema = z.object({
   loyaltyEnabled: fields.loyaltyEnabled.default(false),
   pointsPerUnit: fields.pointsPerUnit.default(0),
   pointValue: fields.pointValue.default(0),
-  receiptFooter: fields.receiptFooter.default('Thank You! Visit Again.'),
+  receiptFooter: fields.receiptFooter.default('Gracias por su compra. ¡Vuelva pronto!'),
   showGst: fields.showGst.default(true),
   autoPrintReceipt: fields.autoPrintReceipt.default(false),
+  usbPrinterWidth: fields.usbPrinterWidth.default(58),
   lowStockAlert: fields.lowStockAlert.default(5),
   allowNegativeStock: fields.allowNegativeStock.default(false),
 });

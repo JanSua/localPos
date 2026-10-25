@@ -15,9 +15,9 @@ import { useUsers, useCreateUser, useUpdateUser } from "@/hooks/useAuth";
 import { useMe } from "@/hooks/useAuth";
 
 const createSchema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
-  email: z.string().trim().toLowerCase().email("Enter a valid email"),
-  password: z.string().min(8, "At least 8 characters"),
+  name: z.string().trim().min(1, "El nombre es obligatorio"),
+  email: z.string().trim().toLowerCase().email("Ingresa un correo electrónico válido"),
+  password: z.string().min(8, "Debe tener al menos 8 caracteres"),
   role: z.enum(["admin", "cashier"]),
 });
 type CreateForm = z.infer<typeof createSchema>;
@@ -40,49 +40,49 @@ export function UsersPanel() {
   const [showForm, setShowForm] = useState(false);
 
   async function onCreate(values: CreateForm) {
-    const result = await withPasswordConfirm("create this staff login", (confirmPassword) =>
+    const result = await withPasswordConfirm("crear este acceso de personal", (confirmPassword) =>
       createUser.mutateAsync({ ...values, confirmPassword })
     );
     if (result) {
-      show("Staff account created", "success");
+      show("Cuenta de personal creada", "success");
       reset({ role: "cashier" });
       setShowForm(false);
     }
   }
 
   async function toggleActive(id: number, active: boolean) {
-    const result = await withPasswordConfirm(active ? "enable this user" : "disable this user", (confirmPassword) =>
+    const result = await withPasswordConfirm(active ? "activar este usuario" : "desactivar este usuario", (confirmPassword) =>
       updateUser.mutateAsync({ id, data: { active, confirmPassword } })
     );
-    if (result) show(active ? "User enabled" : "User disabled", "success");
+    if (result) show(active ? "Usuario activado" : "Usuario desactivado", "success");
   }
 
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-foreground">Staff accounts</h2>
+        <h2 className="text-base font-semibold text-foreground">Cuentas del personal</h2>
         <Button onClick={() => setShowForm((s) => !s)}>
           <UserPlus className="h-4 w-4" aria-hidden="true" />
-          Add staff
+          Agregar personal
         </Button>
       </div>
 
       {showForm && (
         <Card className="p-6">
           <form onSubmit={handleSubmit(onCreate)} noValidate className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Field label="Name" error={errors.name?.message} {...register("name")} />
-            <Field label="Email" type="email" error={errors.email?.message} {...register("email")} />
-            <Field label="Password" type="password" error={errors.password?.message} {...register("password")} />
+            <Field label="Nombre" error={errors.name?.message} {...register("name")} />
+            <Field label="Correo electrónico" type="email" error={errors.email?.message} {...register("email")} />
+            <Field label="Contraseña" type="password" error={errors.password?.message} {...register("password")} />
             <Select
-              label="Role"
+              label="Rol"
               options={[
-                { value: "cashier", label: "Cashier" },
-                { value: "admin", label: "Admin" },
+                { value: "cashier", label: "Cajero" },
+                { value: "admin", label: "Administrador" },
               ]}
               {...register("role")}
             />
             <div className="sm:col-span-2">
-              <Button type="submit" disabled={isSubmitting}>Create account</Button>
+              <Button type="submit" disabled={isSubmitting}>Crear cuenta</Button>
             </div>
           </form>
         </Card>
@@ -93,11 +93,11 @@ export function UsersPanel() {
           <table className="w-full min-w-max text-left text-sm">
             <thead>
               <tr className="text-xs uppercase text-foreground/50">
-                <th className="py-2 pr-4">Name</th>
-                <th className="py-2 pr-4">Email</th>
-                <th className="py-2 pr-4">Role</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 text-right">Action</th>
+                <th className="py-2 pr-4">Nombre</th>
+                <th className="py-2 pr-4">Correo electrónico</th>
+                <th className="py-2 pr-4">Rol</th>
+                <th className="py-2 pr-4">Estado</th>
+                <th className="py-2 text-right">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -105,10 +105,12 @@ export function UsersPanel() {
                 <tr key={u.id}>
                   <td className="py-2.5 pr-4 font-medium text-foreground">
                     {u.name}
-                    {u.id === me?.id && <span className="ml-2 text-xs text-foreground/40">(you)</span>}
+                    {u.id === me?.id && <span className="ml-2 text-xs text-foreground/40">(tú)</span>}
                   </td>
                   <td className="py-2.5 pr-4 text-foreground/70">{u.email}</td>
-                  <td className="py-2.5 pr-4 capitalize text-foreground/70">{u.role}</td>
+                  <td className="py-2.5 pr-4 text-foreground/70">
+                    {u.role === "admin" ? "Administrador" : "Cajero"}
+                  </td>
                   <td className="py-2.5 pr-4">
                     <span
                       className={
@@ -117,7 +119,7 @@ export function UsersPanel() {
                           : "rounded-full bg-foreground/10 px-2.5 py-1 text-xs font-semibold text-foreground/50"
                       }
                     >
-                      {u.active ? "Active" : "Disabled"}
+                      {u.active ? "Activo" : "Desactivado"}
                     </span>
                   </td>
                   <td className="py-2.5 text-right">
@@ -126,7 +128,7 @@ export function UsersPanel() {
                         onClick={() => toggleActive(u.id, !u.active)}
                         className="text-sm font-medium text-brand hover:underline"
                       >
-                        {u.active ? "Disable" : "Enable"}
+                        {u.active ? "Desactivar" : "Activar"}
                       </button>
                     )}
                   </td>

@@ -16,6 +16,7 @@ import {
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
+import { MoneyField } from "@/components/ui/MoneyField";
 import { ReceiptActions } from "@/components/ReceiptActions";
 import { ReturnPanel, type ReturnDraftLine } from "@/components/ReturnPanel";
 import { CameraScannerModal } from "@/components/CameraScannerModal";
@@ -144,14 +145,17 @@ export default function PosPage() {
       setCompletedSale(null);
       setCart((prev) => {
         const existing = prev.find((item) => item.product.id === product.id);
-        if (!existing) return [...prev, { product, quantity: 1 }];
-        if (existing.quantity >= product.stock) {
+        if (
+          !shop?.allowNegativeStock &&
+          (existing?.quantity ?? 0) >= product.stock
+        ) {
           show(
             `Solo ${product.stock} en stock para "${product.name}"`,
             "error",
           );
           return prev;
         }
+        if (!existing) return [...prev, { product, quantity: 1 }];
         return prev.map((item) =>
           item.product.id === product.id
             ? { ...item, quantity: item.quantity + 1 }
@@ -159,7 +163,7 @@ export default function PosPage() {
         );
       });
     },
-    [show],
+    [show, shop?.allowNegativeStock],
   );
 
   const handleScan = useCallback(
@@ -371,7 +375,7 @@ export default function PosPage() {
         .map((item) => {
           if (item.product.id !== productId) return item;
           const nextQty = item.quantity + delta;
-          if (nextQty > item.product.stock) {
+          if (!shop?.allowNegativeStock && nextQty > item.product.stock) {
             show(
               `Solo ${item.product.stock} en stock para "${item.product.name}"`,
               "error",
@@ -562,11 +566,6 @@ export default function PosPage() {
                     <tr key={item.product.id}>
                       <td className="py-2.5 pr-4 font-medium text-foreground">
                         {item.product.name}
-                        {item.product.unit && (
-                          <span className="ml-1.5 font-normal text-foreground/40">
-                            ({item.product.unit})
-                          </span>
-                        )}
                       </td>
                       <td className="py-2.5 pr-4">
                         <div className="flex items-center gap-2">
@@ -677,26 +676,22 @@ export default function PosPage() {
                 </p>
                 <div className="mt-2 flex items-end gap-2">
                   <div className="flex-1">
-                    <Field
+                    <MoneyField
                       label="Saldar deuda anterior (se suma a la factura)"
-                      type="number"
-                      min={0}
-                      max={customer.totalDue}
-                      step="0.01"
                       value={duePaid}
-                      onChange={(e) =>
+                      onChange={(value) =>
                         setDuePaid(
-                          e.target.value === ""
+                          value === null
                             ? ""
                             : String(
                                 Math.min(
-                                  Math.max(0, Number(e.target.value) || 0),
+                                  Math.max(0, value),
                                   customer.totalDue,
                                 ),
                               ),
                         )
                       }
-                      placeholder="0.00"
+                      placeholder="0"
                     />
                   </div>
                   <Button
@@ -889,17 +884,29 @@ export default function PosPage() {
                 <option value="percent">%</option>
                 <option value="amount">{sym}</option>
               </select>
-              <input
-                type="number"
-                min={0}
-                step="0.01"
-                disabled={!discountType}
-                value={discountValue || ""}
-                onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
-                placeholder="Valor del descuento"
-                aria-label="Valor del descuento"
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground disabled:opacity-50"
-              />
+              {discountType === "percent" ? (
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={discountValue || ""}
+                  onChange={(e) =>
+                    setDiscountValue(Number(e.target.value) || 0)
+                  }
+                  placeholder="Valor del descuento"
+                  aria-label="Valor del descuento"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground"
+                />
+              ) : (
+                <MoneyField
+                  disabled={!discountType}
+                  value={discountValue}
+                  onChange={(value) => setDiscountValue(value ?? 0)}
+                  placeholder="Valor del descuento"
+                  aria-label="Valor del descuento"
+                  className="w-full disabled:opacity-50"
+                />
+              )}
             </div>
 
             <h2 className="mt-2 text-base font-semibold text-foreground">
@@ -930,13 +937,12 @@ export default function PosPage() {
             {paymentMethod === "CASH" && (
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <Field
+                  <MoneyField
                     label="Monto recibido"
-                    type="number"
-                    min={0}
-                    step="0.01"
                     value={amountPaid}
-                    onChange={(e) => setAmountPaid(e.target.value)}
+                    onChange={(value) =>
+                      setAmountPaid(value === null ? "" : String(value))
+                    }
                   />
                 </div>
                 <Button

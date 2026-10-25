@@ -1,19 +1,27 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BarcodeCanvas } from "@/components/BarcodeCanvas";
+import { useToast } from "@/components/Toast";
+import { printBarcodeLabel } from "@/lib/printBarcode";
 
 // Shared by BarcodeLabelModal (Inventory row, after a product is saved) and
 // ProductModal (right where the barcode is generated, before saving) — one
 // implementation so a fix here applies everywhere the barcode can be
-// downloaded. Downloads the barcode as a PNG/JPG image; the shopkeeper prints
-// that file with their own label software (no in-app print — it opened an
-// extra browser tab and clipped on thermal label printers).
-export function BarcodeDownloadPanel({ value }: { value: string }) {
+// downloaded. Keeps the browser print and image-download paths in one panel.
+export function BarcodeDownloadPanel({
+  value,
+  name = "",
+  showPrintButton = true,
+}: {
+  value: string;
+  name?: string;
+  showPrintButton?: boolean;
+}) {
   const canvasId = useId();
-  const [format, setFormat] = useState<"EAN13" | "QR">("EAN13");
+  const [format, setFormat] = useState<"CODE128" | "QR">("CODE128");
   const [imageType, setImageType] = useState<"png" | "jpg">("png");
 
   function getCanvas() {
@@ -51,12 +59,12 @@ export function BarcodeDownloadPanel({ value }: { value: string }) {
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => setFormat("EAN13")}
+          onClick={() => setFormat("CODE128")}
           className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-            format === "EAN13" ? "border-brand bg-brand text-brand-foreground" : "border-border text-foreground/70 hover:bg-surface-muted"
+            format === "CODE128" ? "border-brand bg-brand text-brand-foreground" : "border-border text-foreground/70 hover:bg-surface-muted"
           }`}
         >
-          Barcode
+          Code128
         </button>
         <button
           type="button"
@@ -65,7 +73,7 @@ export function BarcodeDownloadPanel({ value }: { value: string }) {
             format === "QR" ? "border-brand bg-brand text-brand-foreground" : "border-border text-foreground/70 hover:bg-surface-muted"
           }`}
         >
-          QR code
+          Código QR
         </button>
       </div>
 
@@ -74,7 +82,7 @@ export function BarcodeDownloadPanel({ value }: { value: string }) {
       </div>
 
       <div className="flex items-center justify-center gap-3 text-sm">
-        <span className="text-foreground/60">Download as</span>
+        <span className="text-foreground/60">Descargar como</span>
         <label className="flex items-center gap-1.5">
           <input type="radio" name={`${canvasId}-image-type`} checked={imageType === "png"} onChange={() => setImageType("png")} />
           PNG
@@ -85,10 +93,58 @@ export function BarcodeDownloadPanel({ value }: { value: string }) {
         </label>
       </div>
 
-      <Button type="button" variant="secondary" onClick={download} className="w-full">
-        <Download className="h-4 w-4" aria-hidden="true" />
-        Download {imageType.toUpperCase()}
-      </Button>
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="secondary" onClick={download}>
+          <Download className="h-4 w-4" aria-hidden="true" />
+          Descargar {imageType.toUpperCase()}
+        </Button>
+        {showPrintButton && <BarcodePrintButton name={name} value={value} />}
+      </div>
     </div>
+  );
+}
+
+export function BarcodePrintButton({
+  name,
+  value,
+}: {
+  name: string;
+  value: string;
+}) {
+  const { show } = useToast();
+
+  async function print() {
+    try {
+      await printBarcodeLabel(
+        name,
+        value,
+        (error) => {
+          show(error.message, "error");
+        },
+        (printerName) => {
+          show(`Etiqueta enviada a ${printerName}`, "success");
+        },
+      );
+    } catch (error) {
+      show(
+        error instanceof Error
+          ? error.message
+          : "No se pudo preparar la etiqueta para imprimir",
+        "error",
+      );
+    }
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={print}
+      disabled={!name.trim()}
+      title={!name.trim() ? "Escribe el nombre del producto para imprimir" : undefined}
+    >
+      <Printer className="h-4 w-4" aria-hidden="true" />
+      Imprimir código de barras
+    </Button>
   );
 }
