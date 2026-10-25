@@ -72,7 +72,7 @@ services:
     restart: unless-stopped
 
     ports:
-      - "${HOST_PORT:-1994}:3000"
+      - "${HOST_BIND_ADDRESS:-0.0.0.0}:${HOST_PORT:-1994}:3000"
 
     depends_on:
       - backend

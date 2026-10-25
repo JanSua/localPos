@@ -288,9 +288,13 @@ Want the web UI on a different port, or to deploy somewhere other than
 its own Compose project, named containers, and data volumes; use a distinct
 value for every shop. The resulting containers are easy to identify, for
 example `localpos-puntoone-front` and `localpos-puntoone-back`. `HOST_PORT`
-controls the host port mapped to the frontend's internal port 3000. On a VPS,
-also set `FRONTEND_ORIGIN` to the URL users will open. **`docker-compose.yml`
-itself never needs editing**, on a shop LAN box or a VPS alike.
+controls the host port mapped to the frontend's internal port 3000.
+`HOST_BIND_ADDRESS` controls the host interface: it defaults to `0.0.0.0`
+for LAN access, but can be set to `127.0.0.1` when a VPS reverse proxy should
+be the only public entry point. On a VPS, also set `FRONTEND_ORIGIN` to the
+URL users will open and `COOKIE_SECURE=true` when HTTPS is enabled.
+**`docker-compose.yml` itself never needs editing**, on a shop LAN box or a
+VPS alike.
 
 ### Use an existing PostgreSQL server
 
@@ -340,6 +344,7 @@ that instance so browser requests are accepted:
 # First instance
 STORE_NAME=puntoone
 HOST_PORT=1994
+HOST_BIND_ADDRESS=127.0.0.1
 POSTGRES_MODE=external
 POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
@@ -347,7 +352,8 @@ POSTGRES_DB=puntoone
 POSTGRES_USER=puntoone
 POSTGRES_PASSWORD=<puntoone-database-password>
 POSTGRES_NETWORK=postgres_backend
-FRONTEND_ORIGIN=http://177.7.32.196:1994
+FRONTEND_ORIGIN=https://puntoone.local-sys.com
+COOKIE_SECURE=true
 
 # Second checkout: use these values in its .env
 STORE_NAME=puntotwo
