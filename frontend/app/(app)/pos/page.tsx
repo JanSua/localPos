@@ -57,7 +57,6 @@ export default function PosPage() {
   const [discountValue, setDiscountValue] = useState(0);
   const [pointsRedeemed, setPointsRedeemed] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
-  const [amountPaid, setAmountPaid] = useState("");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [completedSale, setCompletedSale] = useState<{
     id: number;
@@ -133,8 +132,8 @@ export default function PosPage() {
   // preview showed the FULL return value as "refund" even when some of it
   // was about to go straight to clearing the customer's due — a cashier
   // reading that number had no way to tell the due-clear had actually worked.
-  const tenderedCash =
-    paymentMethod === "CASH" ? Number(amountPaid) || 0 : payable + dueToClear;
+  const collectTotal = round2(payable + dueToClear);
+  const tenderedCash = collectTotal;
   const pool = round2(tenderedCash + grossRefund);
   const amountAppliedToGoods = round2(Math.min(pool, payable));
   const afterGoods = round2(Math.max(0, pool - amountAppliedToGoods));
@@ -142,14 +141,6 @@ export default function PosPage() {
   const leftover = round2(Math.max(0, afterGoods - duePaidFinal));
   const changeDue = grossRefund > 0 ? 0 : leftover;
   const refundValue = grossRefund > 0 ? leftover : 0;
-
-  // "Paid in full" convenience total: goods + due, assuming the cashier
-  // brings fresh cash rather than drawing the due-clear out of a refund.
-  const collectTotal = round2(payable + dueToClear);
-  const shortNow =
-    paymentMethod === "CASH" && Number(amountPaid) > 0 && grossRefund === 0
-      ? Math.max(0, round2(collectTotal - (Number(amountPaid) || 0)))
-      : 0;
 
   const addToCart = useCallback(
     (product: Product) => {
@@ -242,7 +233,6 @@ export default function PosPage() {
     setDiscountValue(0);
     setPointsRedeemed(0);
     setPaymentMethod("CASH");
-    setAmountPaid("");
     setCustomerPanelOpen(false);
     setReturnPanelOpen(false);
     setDiscountPanelOpen(false);
@@ -298,7 +288,7 @@ export default function PosPage() {
           discountValue: Number(discountValue) || 0,
           pointsRedeemed: Number(pointsRedeemed) || 0,
           paymentMethod,
-          amountPaid: paymentMethod === "CASH" ? Number(amountPaid) || 0 : 0,
+          amountPaid: collectTotal,
           duePaid: dueToClear,
           returns: returnsPayload,
           refundMode,
@@ -360,7 +350,7 @@ export default function PosPage() {
     discountValue,
     pointsRedeemed,
     paymentMethod,
-    amountPaid,
+    collectTotal,
     dueToClear,
     canFinalize,
     isCheckingOut,
@@ -1070,18 +1060,6 @@ export default function PosPage() {
                 </span>
               </div>
             )}
-            {paymentMethod === "CASH" &&
-              Number(amountPaid) > 0 &&
-              changeDue > 0 && <Row label="Cambio" value={money(changeDue)} />}
-            {shortNow > 0 && (
-              <p
-                className={`rounded-lg px-3 py-2 text-xs font-medium ${customer ? "bg-warning/10 text-warning" : "bg-danger/10 text-danger"}`}
-              >
-                {customer
-                  ? `${money(shortNow)} faltante — la parte impaga queda en el saldo deudor de ${customer.name}`
-                  : `${money(shortNow)} faltante — agrega un cliente (teléfono) para registrar esto como deuda, o cobra el monto completo`}
-              </p>
-            )}
             {shop?.loyaltyEnabled && customer && quote.pointsEarned > 0 && (
               <p className="text-xs text-foreground/50">
                 Gana {quote.pointsEarned} puntos
@@ -1110,28 +1088,6 @@ export default function PosPage() {
                 </button>
               ))}
             </div>
-            {paymentMethod === "CASH" && (
-              <div className="flex items-end gap-2">
-                <div className="flex-1">
-                  <MoneyField
-                    label="Monto recibido"
-                    value={amountPaid}
-                    onChange={(value) =>
-                      setAmountPaid(value === null ? "" : String(value))
-                    }
-                  />
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="whitespace-nowrap"
-                  onClick={() => setAmountPaid(String(collectTotal))}
-                  disabled={collectTotal === 0}
-                >
-                  Pagado completo
-                </Button>
-              </div>
-            )}
             <Button
               onClick={finalizeSale}
               disabled={!canFinalize || isCheckingOut}

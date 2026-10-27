@@ -354,9 +354,9 @@ function InvoiceDrawer({
                 <h3 className="text-sm font-semibold text-foreground">Anular venta</h3>
                 <p className="mt-1 text-xs text-foreground/60">
                   {isFullyReturned
-                    ? "La devolución ya repuso las existencias. La factura se marcará como anulada sin volver a modificar el inventario ni generar otro reembolso."
-                    : "Conserva la factura como anulada y repone las existencias. No genera un reembolso de dinero."}
-                  {" "}Las ventas con devoluciones parciales o saldos asociados no se pueden anular.
+                    ? "La devolución ya repuso las existencias. La factura se marcará como anulada sin volver a modificar el inventario."
+                    : "La factura se conservará como anulada y se repondrán solo las unidades que no se hayan devuelto."}
+                  {" "}Se mantienen los pagos y devoluciones ya registrados; esta acción no genera otro reembolso.
                 </p>
                 <Button
                   type="button"

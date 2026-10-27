@@ -380,19 +380,6 @@ router.post('/:id/void', requireAdmin, async (req, res) => {
         include: { items: true, returns: { include: { items: true } } },
       });
       if (!invoice) throw Object.assign(new Error('No se encontró la venta.'), { status: 404 });
-      const blockingMovements = [];
-      if (invoice.returnValue > 0.01 || invoice.refundValue > 0.01) {
-        blockingMovements.push('una devolución o reembolso registrados en esta misma venta');
-      }
-      if (invoice.dueAmount > 0.01) blockingMovements.push('saldo pendiente');
-      if (invoice.previousDuePaid > 0.01) blockingMovements.push('pago de un saldo anterior');
-      if (invoice.creditApplied > 0.01) blockingMovements.push('uso de crédito');
-      if (blockingMovements.length > 0) {
-        throw Object.assign(
-          new Error(`No se puede anular esta venta porque registra ${blockingMovements.join(', ')}.`),
-          { status: 409 },
-        );
-      }
 
       const returnedQuantities = new Map();
       for (const record of invoice.returns) {
@@ -403,35 +390,33 @@ router.post('/:id/void', requireAdmin, async (req, res) => {
           );
         }
       }
-      const hasReturns = invoice.returns.length > 0;
-      const isFullyReturned =
-        hasReturns &&
-        invoice.items.every(
-          (item) => (returnedQuantities.get(item.id) || 0) === item.quantity,
-        );
-      if (hasReturns && !isFullyReturned) {
-        throw Object.assign(
-          new Error('No se puede anular una venta con devoluciones parciales. Completa o resuelve primero esas devoluciones.'),
-          { status: 409 },
-        );
-      }
 
       let customerUpdate = null;
       if (invoice.customerId != null) {
         const customer = await tx.customer.findUnique({ where: { id: invoice.customerId } });
         if (customer) {
-          const totalSpent = round2(customer.totalSpent - invoice.totalAmount);
-          const loyaltyPoints = customer.loyaltyPoints - invoice.pointsEarned + invoice.pointsRedeemed;
-          if (totalSpent < 0 || loyaltyPoints < 0) {
-            throw Object.assign(
-              new Error('No se puede anular: el cliente ya usó el saldo generado por esta venta.'),
-              { status: 409 },
-            );
-          }
+          const totalSpent = round2(Math.max(0, customer.totalSpent - invoice.totalAmount));
+          const loyaltyPoints = Math.max(
+            0,
+            customer.loyaltyPoints - invoice.pointsEarned + invoice.pointsRedeemed,
+          );
+          // Customer.totalDue is an aggregate, so subtract this invoice's due
+          // only up to the balance that remains on the customer.
+          const totalDue = round2(Math.max(0, customer.totalDue - invoice.dueAmount));
+          const creditBalance = round2(
+            Math.max(
+              0,
+              customer.creditBalance +
+                invoice.creditApplied -
+                (invoice.refundMode === 'CREDIT' ? invoice.refundValue : 0),
+            ),
+          );
           customerUpdate = {
             id: customer.id,
             totalSpent,
             loyaltyPoints,
+            totalDue,
+            creditBalance,
             visits: Math.max(0, customer.visits - 1),
           };
         }
@@ -460,6 +445,8 @@ router.post('/:id/void', requireAdmin, async (req, res) => {
           data: {
             totalSpent: customerUpdate.totalSpent,
             loyaltyPoints: customerUpdate.loyaltyPoints,
+            totalDue: customerUpdate.totalDue,
+            creditBalance: customerUpdate.creditBalance,
             visits: customerUpdate.visits,
           },
         });
@@ -476,7 +463,7 @@ router.post('/:id/void', requireAdmin, async (req, res) => {
         .then((products) => notifyStockChange(products.map((product) => ({ sku: product.sku, stock: product.stock }))))
         .catch((err) => console.error('post-void stock webhook lookup failed', err));
     }
-    res.json({ message: 'Venta anulada y existencias repuestas.' });
+    res.json({ message: 'Venta anulada y existencias ajustadas según las devoluciones registradas.' });
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error(err);
