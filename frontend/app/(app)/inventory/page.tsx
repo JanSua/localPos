@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import {
+  BarChart3,
   ChevronDown,
   ChevronUp,
   Barcode as BarcodeIcon,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { ProductModal } from "@/components/ProductModal";
 import { StockAdjustModal } from "@/components/StockAdjustModal";
 import { BarcodeLabelModal } from "@/components/BarcodeLabelModal";
+import { InventorySummaryModal } from "@/components/InventorySummaryModal";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { useDeleteProduct, useProducts } from "@/hooks/useProducts";
 import { useShopSettings } from "@/hooks/useShopSettings";
@@ -46,6 +48,7 @@ export default function InventoryPage() {
   const [modal, setModal] = useState<ModalState>(null);
   const [stockTarget, setStockTarget] = useState<Product | null>(null);
   const [labelTarget, setLabelTarget] = useState<Product | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const { data: shop } = useShopSettings();
@@ -127,7 +130,8 @@ export default function InventoryPage() {
 
   useBarcodeScanner({
     onScan: handleScan,
-    enabled: isAdmin && modal === null && stockTarget === null,
+    enabled:
+      isAdmin && modal === null && stockTarget === null && !summaryOpen,
   });
 
   async function handleDelete(product: Product) {
@@ -154,7 +158,17 @@ export default function InventoryPage() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Inventario</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-semibold text-foreground">
+              Inventario
+            </h1>
+            {isAdmin && (
+              <Button variant="secondary" onClick={() => setSummaryOpen(true)}>
+                <BarChart3 className="h-4 w-4" aria-hidden="true" />
+                Resúmenes de inventario
+              </Button>
+            )}
+          </div>
           <p className="flex items-center gap-1.5 text-sm text-foreground/60">
             <ScanBarcode className="h-4 w-4 shrink-0" aria-hidden="true" />
             {isAdmin
@@ -368,6 +382,12 @@ export default function InventoryPage() {
         <StockAdjustModal
           product={stockTarget}
           onClose={() => setStockTarget(null)}
+        />
+      )}
+      {isAdmin && summaryOpen && (
+        <InventorySummaryModal
+          currencySymbol={sym}
+          onClose={() => setSummaryOpen(false)}
         />
       )}
       {labelTarget && (
