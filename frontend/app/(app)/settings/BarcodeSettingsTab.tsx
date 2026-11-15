@@ -6,6 +6,10 @@ import { BarcodeCanvas } from "@/components/BarcodeCanvas";
 import { useToast } from "@/components/Toast";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { Toggle } from "@/components/ui/Toggle";
+import { usePasswordConfirm } from "@/components/PasswordConfirm";
+import { useUpdateSettings } from "@/hooks/useShopSettings";
+import type { ShopSettings } from "@/lib/types";
 import {
   BARCODE_LABEL_OPTIONS_STORAGE_KEY,
   DEFAULT_BARCODE_LABEL_OPTIONS,
@@ -13,6 +17,7 @@ import {
   MAX_BARCODE_LABEL_WIDTH_MM,
   MIN_BARCODE_LABEL_FONT_SIZE,
   MIN_BARCODE_LABEL_WIDTH_MM,
+  detectBarcodePrinter,
   printBarcodeLabel,
   type BarcodeLabelOptions,
 } from "@/lib/printBarcode";
@@ -29,20 +34,23 @@ function isBarcodeLabelOptions(value: unknown): value is BarcodeLabelOptions {
     options.widthMm <= MAX_BARCODE_LABEL_WIDTH_MM &&
     typeof options.fontSize === "number" &&
     options.fontSize >= MIN_BARCODE_LABEL_FONT_SIZE &&
-    options.fontSize <= MAX_BARCODE_LABEL_FONT_SIZE &&
-    (options.showProductName === undefined ||
-      typeof options.showProductName === "boolean")
+    options.fontSize <= MAX_BARCODE_LABEL_FONT_SIZE
   );
 }
 
-export function BarcodeSettingsTab() {
+export function BarcodeSettingsTab({ settings }: { settings: ShopSettings }) {
   const previewId = useId();
   const { show } = useToast();
+  const { withPasswordConfirm } = usePasswordConfirm();
+  const updateSettings = useUpdateSettings();
   const [options, setOptions] = useState<BarcodeLabelOptions>(
     DEFAULT_BARCODE_LABEL_OPTIONS,
   );
   const [loaded, setLoaded] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [showProductName, setShowProductName] = useState(
+    settings.barcodeLabelShowProductName,
+  );
 
   useEffect(() => {
     try {
@@ -57,9 +65,6 @@ export function BarcodeSettingsTab() {
         setOptions({
           widthMm: parsed.widthMm,
           fontSize: parsed.fontSize,
-          showProductName:
-            parsed.showProductName ??
-            DEFAULT_BARCODE_LABEL_OPTIONS.showProductName,
         });
       }
     } catch (error) {
@@ -86,16 +91,32 @@ export function BarcodeSettingsTab() {
   async function printTestLabel() {
     setPrinting(true);
     try {
+      const printerName = await detectBarcodePrinter();
       await printBarcodeLabel(
         TEST_PRODUCT_NAME,
         TEST_BARCODE,
         (error) => show(error.message, "error"),
         (printerName) => show(`Etiqueta enviada a ${printerName}`, "success"),
         options,
+        showProductName,
+        1,
+        printerName,
       );
     } finally {
       setPrinting(false);
     }
+  }
+
+  async function saveProductNameSetting() {
+    const result = await withPasswordConfirm(
+      "guardar esta configuración",
+      (confirmPassword) =>
+        updateSettings.mutateAsync({
+          barcodeLabelShowProductName: showProductName,
+          confirmPassword,
+        }),
+    );
+    if (result) show("Configuración guardada", "success");
   }
 
   const previewWidth = `${options.widthMm * (96 / 25.4)}px`;
@@ -161,19 +182,20 @@ export function BarcodeSettingsTab() {
           </label>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-foreground/70">
-          <input
-            type="checkbox"
-            checked={options.showProductName}
-            onChange={(event) =>
-              setOptions((current) => ({
-                ...current,
-                showProductName: event.target.checked,
-              }))
-            }
-          />
-          Imprimir el nombre del producto al lado del código
-        </label>
+        <Toggle
+          label="Imprimir el nombre del producto al lado del código"
+          checked={showProductName}
+          onChange={setShowProductName}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={saveProductNameSetting}
+          disabled={updateSettings.isPending}
+          className="self-start"
+        >
+          Guardar esta opción
+        </Button>
 
         <div>
           <h3 className="mb-2 text-sm font-medium text-foreground">
@@ -192,7 +214,7 @@ export function BarcodeSettingsTab() {
                   className="max-h-[8mm] max-w-full object-contain"
                 />
               </div>
-              {options.showProductName && <span
+              {showProductName && <span
                 className="min-w-0 flex-1 truncate text-center leading-none"
                 style={{ fontSize: `${options.fontSize}pt` }}
               >

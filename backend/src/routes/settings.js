@@ -39,6 +39,7 @@ const fields = {
   usbPrinterWidth: z.union([z.literal(58), z.literal(80)]),
   lowStockAlert: z.number().int().min(0).max(100000),
   allowNegativeStock: z.boolean(),
+  barcodeLabelShowProductName: z.boolean(),
 };
 
 // POST (onboarding, create-once): every field required or defaulted.
@@ -56,6 +57,7 @@ const createSchema = z.object({
   usbPrinterWidth: fields.usbPrinterWidth.default(58),
   lowStockAlert: fields.lowStockAlert.default(5),
   allowNegativeStock: fields.allowNegativeStock.default(true),
+  barcodeLabelShowProductName: fields.barcodeLabelShowProductName.default(true),
 });
 
 // PUT (partial update): no defaults anywhere, so an omitted key is simply

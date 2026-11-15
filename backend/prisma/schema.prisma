@@ -50,6 +50,7 @@ model ShopSettings {
   // Inventory
   lowStockAlert  Int      @default(5)
   allowNegativeStock Boolean @default(true)
+  barcodeLabelShowProductName Boolean @default(true)
   // Address lookup (see PinCode below)
   pincode        String?
 }

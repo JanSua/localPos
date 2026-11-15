@@ -4,7 +4,15 @@ import { X } from "lucide-react";
 import { BarcodeDownloadPanel } from "@/components/BarcodeDownloadPanel";
 import type { Product } from "@/lib/types";
 
-export function BarcodeLabelModal({ product, onClose }: { product: Product; onClose: () => void }) {
+export function BarcodeLabelModal({
+  product,
+  onClose,
+  onPrinterDetected,
+}: {
+  product: Product;
+  onClose: () => void;
+  onPrinterDetected: (printerName: string) => void;
+}) {
   return (
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
@@ -29,7 +37,11 @@ export function BarcodeLabelModal({ product, onClose }: { product: Product; onCl
 
         <p className="mb-4 text-sm text-foreground/70">{product.name}</p>
 
-        <BarcodeDownloadPanel value={product.barcode} name={product.name} />
+        <BarcodeDownloadPanel
+          value={product.barcode}
+          name={product.name}
+          onPrinterDetected={onPrinterDetected}
+        />
       </div>
     </div>
   );

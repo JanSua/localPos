@@ -5,7 +5,8 @@ import { Download, Printer } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { BarcodeCanvas } from "@/components/BarcodeCanvas";
 import { useToast } from "@/components/Toast";
-import { printBarcodeLabel } from "@/lib/printBarcode";
+import { detectBarcodePrinter } from "@/lib/printBarcode";
+import { BarcodePrintModal } from "@/components/BarcodePrintModal";
 
 // Shared by BarcodeLabelModal (Inventory row, after a product is saved) and
 // ProductModal (right where the barcode is generated, before saving) — one
@@ -15,10 +16,12 @@ export function BarcodeDownloadPanel({
   value,
   name = "",
   showPrintButton = true,
+  onPrinterDetected,
 }: {
   value: string;
   name?: string;
   showPrintButton?: boolean;
+  onPrinterDetected?: (printerName: string) => void;
 }) {
   const canvasId = useId();
   const [format, setFormat] = useState<"CODE128" | "QR">("CODE128");
@@ -98,7 +101,13 @@ export function BarcodeDownloadPanel({
           <Download className="h-4 w-4" aria-hidden="true" />
           Descargar {imageType.toUpperCase()}
         </Button>
-        {showPrintButton && <BarcodePrintButton name={name} value={value} />}
+        {showPrintButton && (
+          <BarcodePrintButton
+            name={name}
+            value={value}
+            onPrinterDetected={onPrinterDetected}
+          />
+        )}
       </div>
     </div>
   );
@@ -107,24 +116,22 @@ export function BarcodeDownloadPanel({
 export function BarcodePrintButton({
   name,
   value,
+  onPrinterDetected,
 }: {
   name: string;
   value: string;
+  onPrinterDetected?: (printerName: string) => void;
 }) {
   const { show } = useToast();
+  const [printerName, setPrinterName] = useState<string | null>(null);
+  const [detectingPrinter, setDetectingPrinter] = useState(false);
 
-  async function print() {
+  async function preparePrint() {
+    setDetectingPrinter(true);
     try {
-      await printBarcodeLabel(
-        name,
-        value,
-        (error) => {
-          show(error.message, "error");
-        },
-        (printerName) => {
-          show(`Etiqueta enviada a ${printerName}`, "success");
-        },
-      );
+      const connectedPrinter = await detectBarcodePrinter();
+      if (onPrinterDetected) onPrinterDetected(connectedPrinter);
+      else setPrinterName(connectedPrinter);
     } catch (error) {
       show(
         error instanceof Error
@@ -132,19 +139,31 @@ export function BarcodePrintButton({
           : "No se pudo preparar la etiqueta para imprimir",
         "error",
       );
+    } finally {
+      setDetectingPrinter(false);
     }
   }
 
   return (
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={print}
-      disabled={!name.trim()}
-      title={!name.trim() ? "Escribe el nombre del producto para imprimir" : undefined}
-    >
-      <Printer className="h-4 w-4" aria-hidden="true" />
-      Imprimir código de barras
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={preparePrint}
+        disabled={!name.trim() || detectingPrinter}
+        title={!name.trim() ? "Escribe el nombre del producto para imprimir" : undefined}
+      >
+        <Printer className="h-4 w-4" aria-hidden="true" />
+        {detectingPrinter ? "Detectando impresora…" : "Imprimir código de barras"}
+      </Button>
+      {printerName && (
+        <BarcodePrintModal
+          name={name}
+          value={value}
+          printerName={printerName}
+          onClose={() => setPrinterName(null)}
+        />
+      )}
+    </>
   );
 }

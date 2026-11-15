@@ -35,6 +35,7 @@ export interface ShopSettings {
   usbPrinterWidth: 58 | 80;
   lowStockAlert: number;
   allowNegativeStock: boolean;
+  barcodeLabelShowProductName: boolean;
   pincode: string | null;
 }
 

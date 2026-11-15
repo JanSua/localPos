@@ -25,7 +25,6 @@ interface DymoFramework {
 export interface BarcodeLabelOptions {
   widthMm: number;
   fontSize: number;
-  showProductName: boolean;
 }
 
 export const MIN_BARCODE_LABEL_WIDTH_MM = 35;
@@ -35,7 +34,6 @@ export const MAX_BARCODE_LABEL_FONT_SIZE = 16;
 export const DEFAULT_BARCODE_LABEL_OPTIONS: BarcodeLabelOptions = {
   widthMm: 67,
   fontSize: 11.6,
-  showProductName: true,
 };
 export const BARCODE_LABEL_OPTIONS_STORAGE_KEY =
   "localpos.barcode-label-settings";
@@ -64,6 +62,7 @@ function getRequiredElement<T extends Element>(
 function configureLabelXml(
   xml: string,
   options: BarcodeLabelOptions,
+  showProductName: boolean,
 ): string {
   const document = new DOMParser().parseFromString(xml, "application/xml");
   if (document.querySelector("parsererror")) {
@@ -118,8 +117,8 @@ function configureLabelXml(
     }
     x.textContent = String((originalX - startX) * scale);
     width.textContent = String(originalObjectWidth * scale);
-    if (objectName === "codigoBarras" && !options.showProductName) {
-      x.textContent = String(startX);
+    if (objectName === "codigoBarras" && !showProductName) {
+      x.textContent = "0";
       width.textContent = String(widthInches);
     }
   }
@@ -149,20 +148,13 @@ function getSavedBarcodeLabelOptions(): BarcodeLabelOptions | null {
     value.widthMm > MAX_BARCODE_LABEL_WIDTH_MM ||
     !Number.isFinite(value.fontSize) ||
     value.fontSize < MIN_BARCODE_LABEL_FONT_SIZE ||
-    value.fontSize > MAX_BARCODE_LABEL_FONT_SIZE ||
-    ("showProductName" in value && typeof value.showProductName !== "boolean")
+    value.fontSize > MAX_BARCODE_LABEL_FONT_SIZE
   ) {
     throw new Error("Los ajustes guardados de etiqueta no son válidos");
   }
-  const showProductName =
-    "showProductName" in value &&
-    typeof value.showProductName === "boolean"
-      ? value.showProductName
-      : DEFAULT_BARCODE_LABEL_OPTIONS.showProductName;
   return {
     widthMm: value.widthMm,
     fontSize: value.fontSize,
-    showProductName,
   };
 }
 
@@ -225,22 +217,73 @@ async function getDymoFramework(): Promise<DymoFramework> {
   return loadDymoFramework();
 }
 
+function getConnectedTapePrinter(printers: DymoPrinterInfo[]): DymoPrinterInfo {
+  const tapePrinters = printers.filter(
+    (printer) => printer.printerType === "TapePrinter" && printer.isConnected,
+  );
+  const labelManager = tapePrinters.filter((printer) =>
+    `${printer.name} ${printer.modelName}`
+      .toLowerCase()
+      .includes("labelmanager 280"),
+  );
+  const printer =
+    labelManager.length === 1
+      ? labelManager[0]
+      : tapePrinters.length === 1
+        ? tapePrinters[0]
+        : null;
+
+  if (!printer) {
+    if (tapePrinters.length === 0) {
+      throw new Error(
+        "No se encontró una DYMO de cinta conectada. Verifica DYMO Connect y la conexión USB.",
+      );
+    }
+    throw new Error(
+      "Hay varias impresoras DYMO de cinta. Deja conectada solo la LabelManager que usarás.",
+    );
+  }
+  return printer;
+}
+
+async function getActiveFramework(): Promise<DymoFramework> {
+  const framework = await getDymoFramework();
+  if (framework.currentFramework !== 2) {
+    throw new Error(
+      "El servicio web de DYMO Connect no está activo. No se usará el modo heredado para evitar abrir DYMO Label.",
+    );
+  }
+  return framework;
+}
+
+export async function detectBarcodePrinter(): Promise<string> {
+  const framework = await getActiveFramework();
+  const printers = await framework.getPrintersAsync();
+  console.info(
+    "[DYMO] Impresoras detectadas",
+    printers.map(({ name, modelName, printerType, isConnected }) => ({
+      name,
+      modelName,
+      printerType,
+      isConnected,
+    })),
+  );
+  return getConnectedTapePrinter(printers).name;
+}
+
 export async function printBarcodeLabel(
   name: string,
   value: string,
   onError: (error: Error) => void,
   onSuccess: (printerName: string) => void,
-  options?: BarcodeLabelOptions,
+  options: BarcodeLabelOptions | undefined,
+  showProductName: boolean,
+  copies: number,
+  expectedPrinterName: string,
 ): Promise<void> {
   let stage = "carga del SDK";
   try {
-    const framework = await getDymoFramework();
-    if (framework.currentFramework !== 2) {
-      throw new Error(
-        "El servicio web de DYMO Connect no está activo. No se usará el modo heredado para evitar abrir DYMO Label.",
-      );
-    }
-
+    const framework = await getActiveFramework();
     stage = "búsqueda de impresoras";
     const printers = await framework.getPrintersAsync();
     console.info(
@@ -252,30 +295,10 @@ export async function printBarcodeLabel(
         isConnected,
       })),
     );
-    const tapePrinters = printers.filter(
-      (printer) =>
-        printer.printerType === "TapePrinter" && printer.isConnected,
-    );
-    const labelManager = tapePrinters.filter((printer) =>
-      `${printer.name} ${printer.modelName}`
-        .toLowerCase()
-        .includes("labelmanager 280"),
-    );
-    const printer =
-      labelManager.length === 1
-        ? labelManager[0]
-        : tapePrinters.length === 1
-          ? tapePrinters[0]
-          : null;
-
-    if (!printer) {
-      if (tapePrinters.length === 0) {
-        throw new Error(
-          "No se encontró una DYMO de cinta conectada. Verifica DYMO Connect y la conexión USB.",
-        );
-      }
+    const printer = getConnectedTapePrinter(printers);
+    if (printer.name !== expectedPrinterName) {
       throw new Error(
-        "Hay varias impresoras DYMO de cinta. Deja conectada solo la LabelManager que usarás.",
+        "La impresora detectada cambió. Cierra este diálogo e inténtalo de nuevo.",
       );
     }
 
@@ -286,11 +309,14 @@ export async function printBarcodeLabel(
         `No se pudo cargar la plantilla de etiqueta (${templateResponse.status})`,
       );
     }
-    const savedOptions = options ?? getSavedBarcodeLabelOptions();
+    const savedOptions =
+      options ?? getSavedBarcodeLabelOptions() ?? DEFAULT_BARCODE_LABEL_OPTIONS;
     const sourceXml = await templateResponse.text();
-    const labelXml = savedOptions
-      ? configureLabelXml(sourceXml, savedOptions)
-      : sourceXml;
+    const labelXml = configureLabelXml(
+      sourceXml,
+      savedOptions,
+      showProductName,
+    );
     const label = framework.openLabelXml(labelXml);
     const objectNames = label.getObjectNames();
     console.info("[DYMO] Objetos de plantilla detectados", objectNames);
@@ -303,16 +329,30 @@ export async function printBarcodeLabel(
     stage = "asignación del nombre del producto";
     label.setObjectText(
       "textoProducto",
-      savedOptions?.showProductName === false ? "" : name,
+      showProductName ? name : "",
     );
     stage = "asignación del código de barras";
     label.setObjectText("codigoBarras", value);
     stage = "envío de impresión";
     console.info("[DYMO] Enviando etiqueta a la impresora", printer.name);
-    await label.printAsync(
-      printer.name,
-      framework.createTapePrintParamsXml({ copies: 1 }),
-    );
+    if (!Number.isInteger(copies) || copies < 1 || copies > 6) {
+      throw new Error("La cantidad debe estar entre 1 y 6 etiquetas.");
+    }
+    for (let copy = 0; copy < copies; copy += 1) {
+      stage = `envío de impresión (${copy + 1} de ${copies})`;
+      try {
+        await label.printAsync(
+          printer.name,
+          framework.createTapePrintParamsXml({ copies: 1 }),
+        );
+      } catch (error) {
+        const detail =
+          error instanceof Error ? ` ${error.message}` : "";
+        throw new Error(
+          `Se enviaron ${copy} de ${copies} etiquetas antes del error.${detail}`,
+        );
+      }
+    }
     console.info("[DYMO] El servicio aceptó el trabajo de impresión");
     onSuccess(printer.name);
   } catch (error) {

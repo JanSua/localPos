@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { ProductModal } from "@/components/ProductModal";
 import { StockAdjustModal } from "@/components/StockAdjustModal";
 import { BarcodeLabelModal } from "@/components/BarcodeLabelModal";
+import { BarcodePrintModal } from "@/components/BarcodePrintModal";
 import { InventorySummaryModal } from "@/components/InventorySummaryModal";
 import { useBarcodeScanner } from "@/hooks/useBarcodeScanner";
 import { useDeleteProduct, useProducts } from "@/hooks/useProducts";
@@ -48,6 +49,10 @@ export default function InventoryPage() {
   const [modal, setModal] = useState<ModalState>(null);
   const [stockTarget, setStockTarget] = useState<Product | null>(null);
   const [labelTarget, setLabelTarget] = useState<Product | null>(null);
+  const [barcodePrintTarget, setBarcodePrintTarget] = useState<{
+    product: Product;
+    printerName: string;
+  } | null>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -394,6 +399,18 @@ export default function InventoryPage() {
         <BarcodeLabelModal
           product={labelTarget}
           onClose={() => setLabelTarget(null)}
+          onPrinterDetected={(printerName) => {
+            setBarcodePrintTarget({ product: labelTarget, printerName });
+            setLabelTarget(null);
+          }}
+        />
+      )}
+      {barcodePrintTarget && (
+        <BarcodePrintModal
+          name={barcodePrintTarget.product.name}
+          value={barcodePrintTarget.product.barcode}
+          printerName={barcodePrintTarget.printerName}
+          onClose={() => setBarcodePrintTarget(null)}
         />
       )}
     </div>
