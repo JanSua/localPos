@@ -148,7 +148,7 @@ function getSavedBarcodeLabelOptions(): BarcodeLabelOptions | null {
     value.widthMm > MAX_BARCODE_LABEL_WIDTH_MM ||
     !Number.isFinite(value.fontSize) ||
     value.fontSize < MIN_BARCODE_LABEL_FONT_SIZE ||
-    value.fontSize > MAX_BARCODE_LABEL_FONT_SIZE
+    value.fontSize > MAX_BARCODE_LABEL_FONT_SIZE ||
     ("showProductName" in value && typeof value.showProductName !== "boolean")
   ) {
     throw new Error("Los ajustes guardados de etiqueta no son válidos");
