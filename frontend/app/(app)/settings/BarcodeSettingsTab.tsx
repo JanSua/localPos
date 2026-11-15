@@ -29,7 +29,9 @@ function isBarcodeLabelOptions(value: unknown): value is BarcodeLabelOptions {
     options.widthMm <= MAX_BARCODE_LABEL_WIDTH_MM &&
     typeof options.fontSize === "number" &&
     options.fontSize >= MIN_BARCODE_LABEL_FONT_SIZE &&
-    options.fontSize <= MAX_BARCODE_LABEL_FONT_SIZE
+    options.fontSize <= MAX_BARCODE_LABEL_FONT_SIZE &&
+    (options.showProductName === undefined ||
+      typeof options.showProductName === "boolean")
   );
 }
 
@@ -52,7 +54,13 @@ export function BarcodeSettingsTab() {
         if (!isBarcodeLabelOptions(parsed)) {
           throw new Error("Los ajustes guardados de etiqueta no son válidos");
         }
-        setOptions(parsed);
+        setOptions({
+          widthMm: parsed.widthMm,
+          fontSize: parsed.fontSize,
+          showProductName:
+            parsed.showProductName ??
+            DEFAULT_BARCODE_LABEL_OPTIONS.showProductName,
+        });
       }
     } catch (error) {
       console.error("[Código de barras] No se pudieron cargar los ajustes", error);
@@ -153,13 +161,27 @@ export function BarcodeSettingsTab() {
           </label>
         </div>
 
+        <label className="flex items-center gap-2 text-sm text-foreground/70">
+          <input
+            type="checkbox"
+            checked={options.showProductName}
+            onChange={(event) =>
+              setOptions((current) => ({
+                ...current,
+                showProductName: event.target.checked,
+              }))
+            }
+          />
+          Imprimir el nombre del producto al lado del código
+        </label>
+
         <div>
           <h3 className="mb-2 text-sm font-medium text-foreground">
             Vista previa (cinta de 9 mm)
           </h3>
           <div className="overflow-x-auto rounded-lg border border-border bg-surface-muted p-4">
             <div
-              className="flex min-w-max items-center gap-2 overflow-hidden bg-white px-2 text-black"
+              className="flex items-center gap-2 overflow-hidden bg-white px-2 text-black"
               style={{ width: previewWidth, height: "9mm" }}
             >
               <div className="flex min-w-0 flex-[2] justify-center overflow-hidden">
@@ -170,12 +192,12 @@ export function BarcodeSettingsTab() {
                   className="max-h-[8mm] max-w-full object-contain"
                 />
               </div>
-              <span
+              {options.showProductName && <span
                 className="min-w-0 flex-1 truncate text-center leading-none"
                 style={{ fontSize: `${options.fontSize}pt` }}
               >
                 {TEST_PRODUCT_NAME}
-              </span>
+              </span>}
             </div>
           </div>
         </div>

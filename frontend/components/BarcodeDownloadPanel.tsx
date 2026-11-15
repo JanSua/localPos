@@ -23,7 +23,6 @@ export function BarcodeDownloadPanel({
   const canvasId = useId();
   const [format, setFormat] = useState<"CODE128" | "QR">("CODE128");
   const [imageType, setImageType] = useState<"png" | "jpg">("png");
-  const [showValue, setShowValue] = useState(true);
 
   function getCanvas() {
     return document.getElementById(canvasId) as HTMLCanvasElement | null;
@@ -78,24 +77,8 @@ export function BarcodeDownloadPanel({
         </button>
       </div>
 
-      {format === "CODE128" && (
-        <label className="flex items-center gap-2 text-sm text-foreground/70">
-          <input
-            type="checkbox"
-            checked={showValue}
-            onChange={(event) => setShowValue(event.target.checked)}
-          />
-          Mostrar texto del código de barras
-        </label>
-      )}
-
       <div className="flex justify-center rounded-lg border border-border bg-white p-4">
-        <BarcodeCanvas
-          value={value}
-          format={format}
-          id={canvasId}
-          showValue={showValue}
-        />
+        <BarcodeCanvas value={value} format={format} id={canvasId} />
       </div>
 
       <div className="flex items-center justify-center gap-3 text-sm">

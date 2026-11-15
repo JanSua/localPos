@@ -25,6 +25,7 @@ interface DymoFramework {
 export interface BarcodeLabelOptions {
   widthMm: number;
   fontSize: number;
+  showProductName: boolean;
 }
 
 export const MIN_BARCODE_LABEL_WIDTH_MM = 35;
@@ -34,6 +35,7 @@ export const MAX_BARCODE_LABEL_FONT_SIZE = 16;
 export const DEFAULT_BARCODE_LABEL_OPTIONS: BarcodeLabelOptions = {
   widthMm: 67,
   fontSize: 11.6,
+  showProductName: true,
 };
 export const BARCODE_LABEL_OPTIONS_STORAGE_KEY =
   "localpos.barcode-label-settings";
@@ -115,6 +117,10 @@ function configureLabelXml(
     }
     x.textContent = String(startX + (originalX - startX) * scale);
     width.textContent = String(originalObjectWidth * scale);
+    if (objectName === "codigoBarras" && !options.showProductName) {
+      x.textContent = String(startX);
+      width.textContent = String(widthInches);
+    }
   }
 
   getRequiredElement(
@@ -143,10 +149,18 @@ function getSavedBarcodeLabelOptions(): BarcodeLabelOptions | null {
     !Number.isFinite(value.fontSize) ||
     value.fontSize < MIN_BARCODE_LABEL_FONT_SIZE ||
     value.fontSize > MAX_BARCODE_LABEL_FONT_SIZE
+    ("showProductName" in value && typeof value.showProductName !== "boolean")
   ) {
     throw new Error("Los ajustes guardados de etiqueta no son válidos");
   }
-  return { widthMm: value.widthMm, fontSize: value.fontSize };
+  return {
+    widthMm: value.widthMm,
+    fontSize: value.fontSize,
+    showProductName:
+      "showProductName" in value
+        ? value.showProductName
+        : DEFAULT_BARCODE_LABEL_OPTIONS.showProductName,
+  };
 }
 
 let frameworkPromise: Promise<DymoFramework> | null = null;
@@ -284,7 +298,10 @@ export async function printBarcodeLabel(
       throw new Error("La plantilla de etiqueta DYMO no tiene sus campos");
     }
     stage = "asignación del nombre del producto";
-    label.setObjectText("textoProducto", name);
+    label.setObjectText(
+      "textoProducto",
+      savedOptions?.showProductName === false ? "" : name,
+    );
     stage = "asignación del código de barras";
     label.setObjectText("codigoBarras", value);
     stage = "envío de impresión";
