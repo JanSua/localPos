@@ -26,10 +26,12 @@ import type { ShopSettings } from "@/lib/types";
 import { UsersPanel } from "./UsersPanel";
 import { ReferenceDataTab } from "./ReferenceDataTab";
 import { IntegrationsTab } from "./IntegrationsTab";
+import { BarcodeSettingsTab } from "./BarcodeSettingsTab";
 const TABS = [
   "Empresa",
   "Impuestos y Lealtad",
   "Recibo",
+  "Código de barras",
   "Datos de Referencia",
   "Integraciones",
   "Contraseña",
@@ -118,6 +120,7 @@ export default function SettingsPage() {
       {isAdmin && tab === "Empresa" && <CompanyTab settings={settings} />}
       {isAdmin && tab === "Impuestos y Lealtad" && <TaxLoyaltyTab settings={settings} />}
       {tab === "Recibo" && <ReceiptTab settings={settings} readOnly={!isAdmin} />}
+      {isAdmin && tab === "Código de barras" && <BarcodeSettingsTab />}
       {isAdmin && tab === "Datos de Referencia" && <ReferenceDataTab />}
       {isAdmin && tab === "Integraciones" && <IntegrationsTab />}
       {tab === "Contraseña" && <PasswordTab />}
