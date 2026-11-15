@@ -14,6 +14,43 @@ function presentProduct(product, user) {
   return visibleProduct;
 }
 
+function normalizeSearch(value) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function isCloseMatch(query, value) {
+  const left = normalizeSearch(query);
+  const right = normalizeSearch(value);
+  if (right.includes(left)) return true;
+
+  const a = left.split(' ');
+  const b = right.split(' ');
+  return a.every((word) =>
+    b.some((candidate) => {
+      if (candidate.includes(word) || word.includes(candidate)) return true;
+      if (!word.length || !candidate.length) return false;
+      let previous = Array.from({ length: candidate.length + 1 }, (_, i) => i);
+      for (let i = 1; i <= word.length; i += 1) {
+        const current = [i];
+        for (let j = 1; j <= candidate.length; j += 1) {
+          current[j] = Math.min(
+            current[j - 1] + 1,
+            previous[j] + 1,
+            previous[j - 1] + (word[i - 1] === candidate[j - 1] ? 0 : 1),
+          );
+        }
+        previous = current;
+      }
+      return 1 - previous[candidate.length] / Math.max(word.length, candidate.length) >= 0.8;
+    }),
+  );
+}
+
 // No `.default()` here on purpose — see settings.js for why. `.default()`
 // fires whenever a key is absent, which would make `productSchema.partial()`
 // silently reset taxRate/discountValue/stock to 0 on any partial update
@@ -78,12 +115,16 @@ function normalizeDiscount(data) {
 router.get('/', async (req, res) => {
   const q = (req.query.q || '').toString().trim();
   const products = await prisma.product.findMany({
-    where: q
-      ? { OR: [{ name: { contains: q } }, { barcode: { contains: q } }, { category: { contains: q } }] }
-      : undefined,
     orderBy: { name: 'asc' },
   });
-  res.json(products.map((product) => presentProduct(product, req.user)));
+  const matches = q
+    ? products.filter((product) =>
+        [product.name, product.barcode, product.category || ''].some((value) =>
+          isCloseMatch(q, value),
+        ),
+      )
+    : products;
+  res.json(matches.map((product) => presentProduct(product, req.user)));
 });
 
 // GET /api/products/low-stock — dashboard widget

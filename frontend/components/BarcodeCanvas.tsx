@@ -9,11 +9,13 @@ export function BarcodeCanvas({
   format,
   id,
   className,
+  showValue = true,
 }: {
   value: string;
   format: "CODE128" | "QR";
   id: string;
   className?: string;
+  showValue?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -26,8 +28,8 @@ export function BarcodeCanvas({
       return;
     }
 
-    JsBarcode(canvas, value, { format: "CODE128", width: 2, height: 70, displayValue: true, margin: 8 });
-  }, [value, format]);
+    JsBarcode(canvas, value, { format: "CODE128", width: 2, height: 70, displayValue: showValue, margin: 8 });
+  }, [value, format, showValue]);
 
   return <canvas ref={canvasRef} id={id} className={className} />;
 }
