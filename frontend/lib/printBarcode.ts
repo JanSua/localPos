@@ -153,13 +153,15 @@ function getSavedBarcodeLabelOptions(): BarcodeLabelOptions | null {
   ) {
     throw new Error("Los ajustes guardados de etiqueta no son válidos");
   }
+  const showProductName =
+    "showProductName" in value &&
+    typeof value.showProductName === "boolean"
+      ? value.showProductName
+      : DEFAULT_BARCODE_LABEL_OPTIONS.showProductName;
   return {
     widthMm: value.widthMm,
     fontSize: value.fontSize,
-    showProductName:
-      "showProductName" in value
-        ? value.showProductName
-        : DEFAULT_BARCODE_LABEL_OPTIONS.showProductName,
+    showProductName,
   };
 }
 
