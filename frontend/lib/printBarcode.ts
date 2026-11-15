@@ -98,6 +98,7 @@ function configureLabelXml(
   }
 
   labelWidth.textContent = String(widthInches);
+  labelStart.textContent = "0";
   getRequiredElement(document, "InitialLength").textContent = String(widthInches);
 
   for (const objectName of ["codigoBarras", "textoProducto"]) {
@@ -115,7 +116,7 @@ function configureLabelXml(
     if (!Number.isFinite(originalX) || !Number.isFinite(originalObjectWidth)) {
       throw new Error(`Las dimensiones de ${objectName} no son válidas`);
     }
-    x.textContent = String(startX + (originalX - startX) * scale);
+    x.textContent = String((originalX - startX) * scale);
     width.textContent = String(originalObjectWidth * scale);
     if (objectName === "codigoBarras" && !options.showProductName) {
       x.textContent = String(startX);
