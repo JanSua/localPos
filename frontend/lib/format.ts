@@ -7,11 +7,7 @@ export function formatGroupedAmount(amount: number): string {
     groups.unshift(digits.slice(Math.max(0, end - 3), end));
   }
 
-  const separator = groups.length > 1 ? "." : "";
-  const grouped =
-    groups.length > 1
-      ? `${groups.slice(0, -1).join("'")}${separator}${groups[groups.length - 1]}`
-      : groups[0];
+  const grouped = groups.join(".");
 
   return safeAmount < 0 ? `-${grouped}` : grouped;
 }
@@ -33,9 +29,7 @@ export function formatAmountInput(value: number | string): string {
     groups.unshift(digits.slice(Math.max(0, end - 3), end));
   }
 
-  return groups.length > 1
-    ? `${groups.slice(0, -1).join("'")}.${groups[groups.length - 1]}`
-    : groups[0];
+  return groups.join(".");
 }
 
 // Keep the shop's configured currency symbol while displaying whole pesos.

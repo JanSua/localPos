@@ -89,6 +89,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   UPI: "UPI",
   TRANSFER: "Transferencia",
   CARD: "Tarjeta",
+  MIXED: "Varios métodos",
 };
 
 function RevenueTooltip({

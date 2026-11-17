@@ -28,7 +28,14 @@ function buildReceiptHtml({ shop, invoice }) {
     UPI: 'UPI',
     TRANSFER: 'Transferencia',
     CARD: 'Tarjeta',
+    MIXED: 'Varios métodos',
   }[invoice.paymentMethod] || invoice.paymentMethod;
+  const paymentRows = Array.isArray(invoice.paymentBreakdown) && invoice.paymentBreakdown.length
+    ? invoice.paymentBreakdown.map((payment) => {
+        const label = { CASH: 'Efectivo', TRANSFER: 'Transferencia', CARD: 'Tarjeta' }[payment.method] || payment.method;
+        return `<tr><td>Pagado (${esc(label)})</td><td class="num">${money(payment.amount)}</td></tr>`;
+      }).join('')
+    : `<tr><td>Pagado (${esc(paymentMethod)})</td><td class="num">${money(invoice.amountPaid)}</td></tr>`;
 
   const itemRows = invoice.items
     .map(
@@ -179,7 +186,7 @@ function buildReceiptHtml({ shop, invoice }) {
         ? ''
         : `<hr class="rule">
     <table class="totals">
-      <tr><td>Pagado (${esc(paymentMethod)})</td><td class="num">${money(invoice.amountPaid)}</td></tr>
+      ${paymentRows}
       ${
         invoice.previousDuePaid > 0
           ? `<tr><td>Abono de deuda anterior</td><td class="num">${money(invoice.previousDuePaid)}</td></tr>

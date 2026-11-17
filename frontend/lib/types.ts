@@ -119,7 +119,8 @@ export interface Invoice {
   taxAmount: number;
   loyaltyDiscount: number;
   totalAmount: number;
-  paymentMethod: "CASH" | "UPI" | "TRANSFER" | "CARD";
+  paymentMethod: "CASH" | "UPI" | "TRANSFER" | "CARD" | "MIXED";
+  paymentBreakdown?: { method: PaymentMethod; amount: number }[] | null;
   amountPaid: number;
   changeDue: number;
   dueAmount: number;

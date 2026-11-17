@@ -122,6 +122,7 @@ model Invoice {
   loyaltyDiscount Float        @default(0) // currency value of redeemed points
   totalAmount    Float // final payable
   paymentMethod  String        @default("CASH") // CASH | UPI | CARD
+  paymentBreakdown Json?
   amountPaid     Float         @default(0)
   changeDue      Float         @default(0)
   dueAmount      Float         @default(0) // unpaid shortfall added to the customer's running due ("udhaar")

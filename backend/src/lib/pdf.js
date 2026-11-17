@@ -105,6 +105,7 @@ function buildReceiptPdf({ shop, invoice }) {
       UPI: 'UPI',
       TRANSFER: 'Transferencia',
       CARD: 'Tarjeta',
+      MIXED: 'Varios métodos',
     }[invoice.paymentMethod] || invoice.paymentMethod;
 
     doc.font('Helvetica-Bold').fontSize(13).text(shop.shopName, { align: 'center' });
@@ -212,7 +213,14 @@ function buildReceiptPdf({ shop, invoice }) {
       const grandLabel = invoice.returnValue > 0 || invoice.creditApplied > 0 ? 'TOTAL NETO' : 'TOTAL';
       totalLine(grandLabel, money(sym, payable), true);
       rule(doc);
-      totalLine(`Pagado (${paymentMethod})`, money(sym, invoice.amountPaid));
+      if (Array.isArray(invoice.paymentBreakdown) && invoice.paymentBreakdown.length) {
+        const labels = { CASH: 'Efectivo', TRANSFER: 'Transferencia', CARD: 'Tarjeta' };
+        for (const payment of invoice.paymentBreakdown) {
+          totalLine(`Pagado (${labels[payment.method] || payment.method})`, money(sym, payment.amount));
+        }
+      } else {
+        totalLine(`Pagado (${paymentMethod})`, money(sym, invoice.amountPaid));
+      }
       if (invoice.previousDuePaid > 0) {
         totalLine('Abono de deuda anterior', money(sym, invoice.previousDuePaid));
         totalLine('Total recibido', money(sym, invoice.amountPaid + invoice.previousDuePaid), true);

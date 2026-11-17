@@ -57,6 +57,11 @@ export default function PosPage() {
   const [discountValue, setDiscountValue] = useState(0);
   const [pointsRedeemed, setPointsRedeemed] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [multiplePayments, setMultiplePayments] = useState(false);
+  const [selectedMethods, setSelectedMethods] = useState<PaymentMethod[]>(["CASH"]);
+  const [paymentAmounts, setPaymentAmounts] = useState<Record<string, number>>({});
+  const [changeDialog, setChangeDialog] = useState<"choice" | "cash" | null>(null);
+  const [cashGiven, setCashGiven] = useState(0);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [completedSale, setCompletedSale] = useState<{
     id: number;
@@ -133,6 +138,31 @@ export default function PosPage() {
   // was about to go straight to clearing the customer's due — a cashier
   // reading that number had no way to tell the due-clear had actually worked.
   const collectTotal = round2(payable + dueToClear);
+  const suggestedCash = Math.max(0, round2(collectTotal - selectedMethods
+    .filter((selected) => selected !== "CASH")
+    .reduce((sum, selected) => sum + (paymentAmounts[selected] || 0), 0)));
+  const activePayments = multiplePayments
+    ? selectedMethods.map((method) => ({
+        method,
+        amount: method === "CASH"
+          ? paymentAmounts.CASH ?? suggestedCash
+          : paymentAmounts[method] || 0,
+      }))
+    : [{ method: paymentMethod, amount: collectTotal }];
+  const enteredNonCash = activePayments
+    .filter((payment) => payment.method !== "CASH")
+    .reduce((sum, payment) => sum + payment.amount, 0);
+  const cashRequired = Math.max(0, round2(collectTotal - enteredNonCash));
+  const cashAmount = activePayments.find((payment) => payment.method === "CASH")?.amount || 0;
+  const paidMethods = activePayments.filter((payment) => payment.amount > 0);
+  const paymentTotal = round2(activePayments.reduce((sum, payment) => sum + payment.amount, 0));
+  const paymentIsValid = !multiplePayments || (
+    selectedMethods.length > 0 &&
+    paymentTotal >= collectTotal &&
+    enteredNonCash <= collectTotal &&
+    activePayments.filter((payment) => payment.method !== "CASH")
+      .every((payment) => payment.amount <= collectTotal)
+  );
   const tenderedCash = collectTotal;
   const pool = round2(tenderedCash + grossRefund);
   const amountAppliedToGoods = round2(Math.min(pool, payable));
@@ -233,6 +263,9 @@ export default function PosPage() {
     setDiscountValue(0);
     setPointsRedeemed(0);
     setPaymentMethod("CASH");
+    setMultiplePayments(false);
+    setSelectedMethods(["CASH"]);
+    setPaymentAmounts({});
     setCustomerPanelOpen(false);
     setReturnPanelOpen(false);
     setDiscountPanelOpen(false);
@@ -244,7 +277,7 @@ export default function PosPage() {
   const canFinalize =
     cart.length > 0 || returnLines.length > 0 || dueToClear > 0;
 
-  const finalizeSale = useCallback(async () => {
+  const finalizeSale = useCallback(async (cashTendered?: number) => {
     if (!canFinalize || isCheckingOut) return;
     setIsCheckingOut(true);
     try {
@@ -287,8 +320,17 @@ export default function PosPage() {
           discountType,
           discountValue: Number(discountValue) || 0,
           pointsRedeemed: Number(pointsRedeemed) || 0,
-          paymentMethod,
-          amountPaid: collectTotal,
+          paymentMethod: multiplePayments && paidMethods.length === 1
+            ? paidMethods[0].method
+            : paymentMethod,
+          amountPaid: cashTendered ?? (multiplePayments ? paymentTotal : collectTotal),
+          paymentBreakdown: multiplePayments && paidMethods.length > 1
+            ? paidMethods.map((payment) =>
+                payment.method === "CASH" && cashTendered !== undefined
+                  ? { ...payment, amount: cashTendered }
+                  : payment,
+              )
+            : undefined,
           duePaid: dueToClear,
           returns: returnsPayload,
           refundMode,
@@ -350,6 +392,9 @@ export default function PosPage() {
     discountValue,
     pointsRedeemed,
     paymentMethod,
+    multiplePayments,
+    activePayments,
+    paymentTotal,
     collectTotal,
     dueToClear,
     canFinalize,
@@ -359,6 +404,17 @@ export default function PosPage() {
     withPasswordConfirm,
     shop?.autoPrintReceipt,
   ]);
+
+  function startFinalize() {
+    if (!canFinalize || isCheckingOut || !paymentIsValid) return;
+    const usesCash = activePayments.some((payment) => payment.method === "CASH" && payment.amount > 0);
+    if (usesCash && collectTotal > 0) {
+      setCashGiven(cashAmount);
+      setChangeDialog("choice");
+      return;
+    }
+    void finalizeSale();
+  }
 
   useBarcodeScanner({ onScan: handleScan });
 
@@ -1058,17 +1114,34 @@ export default function PosPage() {
                 Gana {quote.pointsEarned} puntos
               </p>
             )}
-            <h2 className="mt-2 text-base font-semibold text-foreground">
-              Pago
-            </h2>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-foreground">Pago</h2>
+              <label className="flex items-center gap-2 text-sm text-foreground/70">
+                <input
+                  type="checkbox"
+                  checked={multiplePayments}
+                  onChange={(event) => {
+                    setMultiplePayments(event.target.checked);
+                    setSelectedMethods(["CASH"]);
+                  }}
+                  className="accent-brand"
+                />
+                Varios métodos de pago
+              </label>
+            </div>
             <div className="grid grid-cols-3 gap-2">
               {(["CASH", "TRANSFER", "CARD"] as PaymentMethod[]).map((m) => (
                 <button
                   key={m}
                   type="button"
-                  onClick={() => setPaymentMethod(m)}
+                  onClick={() => multiplePayments
+                    ? setSelectedMethods((current) =>
+                        current.includes(m)
+                          ? current.length > 1 ? current.filter((method) => method !== m) : current
+                          : [...current, m])
+                    : setPaymentMethod(m)}
                   className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                    paymentMethod === m
+                    (multiplePayments ? selectedMethods.includes(m) : paymentMethod === m)
                       ? "border-brand bg-brand text-brand-foreground"
                       : "border-border text-foreground/70 hover:bg-surface-muted"
                   }`}
@@ -1081,9 +1154,24 @@ export default function PosPage() {
                 </button>
               ))}
             </div>
+            {multiplePayments && selectedMethods.map((method) => (
+              <div key={method} className="mt-2">
+                <MoneyField
+                  label={method === "CASH" ? "Efectivo" : method === "TRANSFER" ? "Transferencia" : "Tarjeta"}
+                  value={method === "CASH" ? paymentAmounts.CASH ?? suggestedCash : paymentAmounts[method] || 0}
+                  onChange={(value) => setPaymentAmounts((current) => ({ ...current, [method]: value ?? 0 }))}
+                />
+                {method === "CASH" && enteredNonCash > 0 && !paymentAmounts.CASH && (
+                  <p className="mt-1 text-xs text-foreground/60">Sugerencia: {money(suggestedCash)}</p>
+                )}
+              </div>
+            ))}
+            {multiplePayments && !paymentIsValid && (
+              <p className="text-xs text-danger">Los valores deben cubrir el total de la venta.</p>
+            )}
             <Button
-              onClick={finalizeSale}
-              disabled={!canFinalize || isCheckingOut}
+              onClick={startFinalize}
+              disabled={!canFinalize || isCheckingOut || !paymentIsValid}
               className="mt-2 w-full"
             >
               {isCheckingOut
@@ -1099,6 +1187,77 @@ export default function PosPage() {
           </Card>
         </div>
       </div>
+      {changeDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setChangeDialog(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="change-dialog-title"
+            className="w-full max-w-sm rounded-xl bg-surface p-6 shadow-xl"
+          >
+            <h2 id="change-dialog-title" className="mb-4 text-lg font-semibold text-foreground">
+              {changeDialog === "choice" ? "¿Deseas ayuda para el cambio?" : "¿Cuánto efectivo te dieron?"}
+            </h2>
+            {changeDialog === "choice" ? (
+              <div className="flex flex-col gap-3">
+                <Button
+                  onClick={() => {
+                    setChangeDialog(null);
+                    void finalizeSale();
+                  }}
+                  disabled={isCheckingOut}
+                >
+                  No, finalizar venta
+                </Button>
+                <Button variant="secondary" onClick={() => setChangeDialog("cash")}>
+                  Sí
+                </Button>
+                <Button variant="secondary" onClick={() => setChangeDialog(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                <MoneyField
+                  label="Efectivo recibido"
+                  autoFocus
+                  value={cashGiven}
+                  onChange={(value) => setCashGiven(value ?? 0)}
+                />
+                {cashGiven < cashRequired ? (
+                  <p className="text-sm font-medium text-danger">
+                    Faltan {money(cashRequired - cashGiven)} pesos
+                  </p>
+                ) : (
+                  <p className="text-sm text-foreground/70">
+                    Debes devolver: <span className="font-semibold text-foreground">{money(cashGiven - cashRequired)}</span>
+                  </p>
+                )}
+                <div className="flex justify-end gap-3">
+                  <Button variant="secondary" onClick={() => setChangeDialog(null)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    disabled={cashGiven < cashRequired || isCheckingOut}
+                    onClick={() => {
+                      setChangeDialog(null);
+                      void finalizeSale(cashGiven);
+                    }}
+                  >
+                    {isCheckingOut ? "Procesando…" : "Finalizar venta"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

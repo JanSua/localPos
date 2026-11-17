@@ -25,6 +25,10 @@ const checkoutSchema = z
     discountValue: z.number().min(0).default(0),
     pointsRedeemed: z.number().int().min(0).default(0),
     paymentMethod: z.enum(['CASH', 'UPI', 'TRANSFER', 'CARD']).default('CASH'),
+    paymentBreakdown: z.array(z.object({
+      method: z.enum(['CASH', 'TRANSFER', 'CARD']),
+      amount: z.number().min(0),
+    })).min(1).optional(),
     amountPaid: z.number().min(0).default(0),
     // Old outstanding due the customer chooses to clear as part of this bill.
     // Added on top of the goods total for what the cashier collects.
@@ -218,8 +222,13 @@ router.post('/', async (req, res) => {
       // changing hands. The previous version only pulled from tendered cash,
       // so a due-clear requested on a pure-return bill (nothing to "tender")
       // silently never applied — the balance just sat there unchanged.
-      const tenderedCash = body.paymentMethod === 'CASH' ? body.amountPaid : payable + duePaidIntent;
-      const pool = round2(tenderedCash + grossRefund);
+      const tendered = body.paymentBreakdown
+        ? round2(body.paymentBreakdown.reduce((sum, payment) => sum + payment.amount, 0))
+        : body.paymentMethod === 'CASH' ? body.amountPaid : payable + duePaidIntent;
+      if (body.paymentBreakdown && tendered < round2(payable + duePaidIntent)) {
+        throw Object.assign(new Error('Los pagos no cubren el total a cobrar.'), { status: 400 });
+      }
+      const pool = round2(tendered + grossRefund);
       const amountPaid = round2(Math.min(pool, payable));
       const afterGoods = round2(Math.max(0, pool - amountPaid));
       const previousDuePaid = round2(Math.min(duePaidIntent, afterGoods));
@@ -253,7 +262,12 @@ router.post('/', async (req, res) => {
           taxAmount: computed.taxAmount,
           loyaltyDiscount: computed.loyaltyDiscount,
           totalAmount: computed.totalAmount,
-          paymentMethod: body.paymentMethod,
+          paymentMethod: body.paymentBreakdown
+            ? body.paymentBreakdown.filter((payment) => payment.amount > 0).length > 1
+              ? 'MIXED'
+              : body.paymentBreakdown.find((payment) => payment.amount > 0)?.method || body.paymentMethod
+            : body.paymentMethod,
+          paymentBreakdown: body.paymentBreakdown || undefined,
           amountPaid,
           changeDue,
           dueAmount,

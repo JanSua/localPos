@@ -345,10 +345,20 @@ function InvoiceDrawer({
                 <span>Total</span>
                 <span>{money(invoice.totalAmount)}</span>
               </div>
-              <Line
-                label={`Pagado (${paymentMethodLabel(invoice.paymentMethod)})`}
-                value={money(invoice.amountPaid)}
-              />
+              {invoice.paymentBreakdown?.length ? (
+                invoice.paymentBreakdown.map((payment) => (
+                  <Line
+                    key={payment.method}
+                    label={`Pagado (${paymentMethodLabel(payment.method)})`}
+                    value={money(payment.amount)}
+                  />
+                ))
+              ) : (
+                <Line
+                  label={`Pagado (${paymentMethodLabel(invoice.paymentMethod)})`}
+                  value={money(invoice.amountPaid)}
+                />
+              )}
               {invoice.changeDue > 0 && (
                 <Line label="Cambio" value={money(invoice.changeDue)} />
               )}
@@ -584,12 +594,13 @@ function InvoiceDrawer({
   );
 }
 
-function paymentMethodLabel(method: "CASH" | "UPI" | "TRANSFER" | "CARD") {
+function paymentMethodLabel(method: "CASH" | "UPI" | "TRANSFER" | "CARD" | "MIXED") {
   return {
     CASH: "Efectivo",
     UPI: "UPI",
     TRANSFER: "Transferencia",
     CARD: "Tarjeta",
+    MIXED: "Varios métodos",
   }[method];
 }
 
