@@ -19,6 +19,7 @@ import type {
 } from "recharts/types/component/DefaultTooltipContent";
 import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/Card";
+import { QuickDateFilters } from "@/components/QuickDateFilters";
 import { useSalesAnalytics } from "@/hooks/useInvoices";
 import { formatMoney } from "@/lib/format";
 import { ApiError } from "@/lib/api";
@@ -235,6 +236,23 @@ export function SalesCharts({ sym }: { sym: string }) {
               />
             </label>
           </div>
+        </div>
+        <div className="mt-4">
+          <QuickDateFilters
+            from={from}
+            to={to}
+            originalFrom={initial.from}
+            originalTo={initial.to}
+            onSelect={(nextFrom, nextTo) => {
+              setFrom(nextFrom);
+              setTo(nextTo);
+              setPeriod(
+                nextFrom === initial.from && nextTo === initial.to
+                  ? "last14"
+                  : "custom",
+              );
+            }}
+          />
         </div>
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-lg bg-surface-muted p-3">

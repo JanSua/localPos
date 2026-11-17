@@ -360,18 +360,7 @@ export default function PosPage() {
     shop?.autoPrintReceipt,
   ]);
 
-  useBarcodeScanner({
-    onScan: handleScan,
-    onManualEnter: (event) => {
-      const target = event.target as HTMLElement | null;
-      const editable =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
-      if (editable) return;
-      finalizeSale();
-    },
-  });
+  useBarcodeScanner({ onScan: handleScan });
 
   function updateQuantity(productId: number, delta: number) {
     setCart((prev) =>
@@ -404,8 +393,7 @@ export default function PosPage() {
           </h1>
           <p className="flex items-center gap-1.5 text-sm text-foreground/60">
             <ScanBarcode className="h-4 w-4" aria-hidden="true" />
-            Escanea un código de barras para agregar artículos. Presiona Enter
-            para finalizar.
+            Escanea un código de barras para agregar artículos.
           </p>
         </div>
         <Button
@@ -480,7 +468,11 @@ export default function PosPage() {
               <input
                 type="text"
                 value={manualQuery}
-                onChange={(e) => setManualQuery(e.target.value)}
+                onChange={(e) => {
+                  setManualQuery(e.target.value);
+                  setManualSearchFocused(true);
+                }}
+                onClick={() => setManualSearchFocused(true)}
                 onFocus={() => setManualSearchFocused(true)}
                 onBlur={() => setManualSearchFocused(false)}
                 placeholder="¿Escáner no funciona? Escribe un nombre de producto o código de barras para agregar…"
@@ -498,7 +490,7 @@ export default function PosPage() {
                 </button>
               )}
             </div>
-            {(manualSearchFocused || manualQuery.trim()) && (
+            {manualSearchFocused && (
               <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-border bg-surface shadow-lg">
                 {manualQuery.trim() !== committedQuery || !manualOptions ? (
                   <p className="px-3 py-2.5 text-sm text-foreground/50">
@@ -524,6 +516,7 @@ export default function PosPage() {
                           addToCart(p);
                           setManualQuery("");
                           setCommittedQuery("");
+                          setManualSearchFocused(false);
                         }}
                         className="flex w-full items-center justify-between gap-3 border-b border-border px-3 py-2.5 text-left text-sm last:border-b-0 hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -1096,12 +1089,12 @@ export default function PosPage() {
               {isCheckingOut
                 ? "Procesando…"
                 : refundValue > 0 && cart.length === 0
-                  ? "Procesar Devolución (Enter)"
+                  ? "Procesar Devolución"
                   : cart.length === 0 &&
                       returnLines.length === 0 &&
                       dueToClear > 0
-                    ? "Cobrar Deuda (Enter)"
-                    : "Finalizar Venta (Enter)"}
+                    ? "Cobrar Deuda"
+                    : "Finalizar Venta"}
             </Button>
           </Card>
         </div>

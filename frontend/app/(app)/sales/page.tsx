@@ -5,6 +5,7 @@ import { Search, Undo2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ReceiptActions } from "@/components/ReceiptActions";
+import { QuickDateFilters } from "@/components/QuickDateFilters";
 import { useInvoices, useInvoice, useVoidInvoice } from "@/hooks/useInvoices";
 import { useCreateReturn, useReturnsForInvoice } from "@/hooks/useReturns";
 import { useShopSettings } from "@/hooks/useShopSettings";
@@ -69,6 +70,18 @@ export default function SalesPage() {
               className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground"
             />
           </label>
+        </div>
+        <div className="mb-4">
+          <QuickDateFilters
+            from={from}
+            to={to}
+            originalFrom=""
+            originalTo=""
+            onSelect={(nextFrom, nextTo) => {
+              setFrom(nextFrom);
+              setTo(nextTo);
+            }}
+          />
         </div>
 
         {isLoading ? (
